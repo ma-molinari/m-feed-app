@@ -18,3 +18,15 @@ export type PostWithAuthor = {
 };
 
 export type FeedPage = { ct: number; data: PostWithAuthor[] };
+
+export type CommentWithUser = {
+  id: number;
+  userId: number;
+  postId: number;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  user: PostAuthorSnippet;
+};
+
+export type CommentsPage = { ct: number; data: CommentWithUser[] };

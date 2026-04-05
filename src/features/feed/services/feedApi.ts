@@ -1,6 +1,6 @@
 import { apiClient } from '@services/api/client';
 
-import type { FeedPage } from '../types';
+import type { CommentsPage, FeedPage, PostWithAuthor } from '../types';
 
 /** Login/register usam envelope `{ data: … }`; o feed retorna `{ ct, data }` direto no corpo (sem wrapper). */
 type ApiEnvelope<T> = { data: T };
@@ -38,4 +38,23 @@ export async function unlikePost(postId: number): Promise<void> {
 
 export async function deletePost(id: number): Promise<void> {
   await apiClient.delete(`/api/posts/${id}`);
+}
+
+export async function fetchPostById(id: number): Promise<PostWithAuthor> {
+  const { data } = await apiClient.get<ApiEnvelope<PostWithAuthor>>(`/api/posts/${id}`);
+  return data.data;
+}
+
+export async function fetchComments(
+  postId: number,
+  params: { page: number; limit?: number },
+): Promise<CommentsPage> {
+  const { data } = await apiClient.get<CommentsPage>(`/api/posts/${postId}/comments`, {
+    params: { page: params.page, limit: params.limit },
+  });
+  return data;
+}
+
+export async function createComment(postId: number, content: string): Promise<void> {
+  await apiClient.post(`/api/posts/${postId}/comments`, { content });
 }

@@ -2,6 +2,8 @@ import { View } from 'react-native';
 import { createStaticNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { PostDetailScreen } from '@features/feed/screens/PostDetailScreen';
+
 import { MainTabNavigator } from './TabNavigator';
 
 function StackPlaceholderScreen() {
@@ -16,7 +18,7 @@ const MainStack = createNativeStackNavigator({
       options: { headerShown: false },
     },
     PostDetail: {
-      screen: StackPlaceholderScreen,
+      screen: PostDetailScreen,
       options: { headerShown: false },
     },
     EditPost: {

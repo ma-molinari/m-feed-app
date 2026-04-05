@@ -1,45 +1,61 @@
 # Concerns
 
-Evidence-backed risks and gaps; omitting items without a clear code or config trail.
+Riscos e gaps com respaldo em código ou config; itens sem evidência foram omitidos.
 
-## High — Authentication is not backed by the API
+---
 
-**Evidence:** `LoginScreen.tsx` `onSubmit` calls `setToken('demo-token')` only; `authApi.ts` defines `LoginPayload` / `LoginResponse` but has no `apiClient` calls.  
-**Impact:** Any real backend expecting JWT exchange is bypassed; token shape and expiry are not validated.  
-**Fix:** Implement `login(payload)` in `authApi.ts`, call it from `LoginScreen` (or a dedicated hook), handle errors, and persist the returned token.
+## Medium — expo-sqlite declarado sem uso
 
-## High — Feed query disabled and UI disconnected from API
+**Evidência:** `expo-sqlite` em `package.json` e `app.json` `plugins`; nenhum import em `src/`.  
+**Impacto:** Superfície nativa desnecessária (maior binário, tempo de build, manutenção).  
+**Fix:** Remover plugin e dependência até que um banco local seja de fato necessário, ou implementar a persistência planejada.
 
-**Evidence:** `useFeedItems.ts` sets `enabled: false`; `FeedScreen.tsx` uses `const PLACEHOLDER: Row[] = []` and never imports `useFeedItems` or `fetchFeedItems`.  
-**Impact:** Users always see an empty list despite `feedApi.ts` being ready for `GET /feed`.  
-**Fix:** Enable the query when appropriate (e.g. when `apiUrl` and token exist), map `FeedItem` (`imageUrl`) to list rows, and wire `FlashList` `data` to query results with loading/error states.
+---
 
-## Medium — Unused native dependency (expo-sqlite)
+## Medium — Cobertura de testes muito baixa para a base atual
 
-**Evidence:** `expo-sqlite` in `package.json` and `app.json` `plugins`; no usage in `src/`.  
-**Impact:** Larger binary / native surface area and maintenance cost without benefit; confuses readers about data layer.  
-**Fix:** Remove plugin and dependency until a local DB is required, or implement the planned persistence and document it.
+**Evidência:** Apenas `__tests__/LoginScreen.test.tsx` e `__tests__/App.test.tsx`; sem testes para os novos navigators (`TabNavigator`, `MainNavigator`), `apiClient`, feed, create, profile ou search.  
+**Impacto:** Regressões em roteamento, mutações otimistas ou fluxos de API podem passar despercebidas.  
+**Fix:** Adicionar testes de integração com MSW ou Axios mockado para as mutações do feed (`useFeedMutations`) e o handler de 401; testes rasps para o split de autenticação no `RootNavigator`.
 
-## Medium — Dual lockfiles
+---
 
-**Evidence:** Both `package-lock.json` and `yarn.lock` appear in the project tree.  
-**Impact:** Inconsistent installs across machines and CI.  
-**Fix:** Choose npm or Yarn, delete the other lockfile, and document the choice in team onboarding (no new markdown required if you prefer to only fix the repo).
+## Medium — Tabs com cor hardcoded fora do sistema de tokens
 
-## Low — `useAuth` hook is a pass-through
+**Evidência:** `TabNavigator.tsx` usa `'#000000'`, `'#FFFFFF'` e `'rgba(255,255,255,0.4)'` diretamente em `tabBarStyle` e `screenOptions`.  
+**Impacto:** Se o tema mudar, a tab bar fica desalinhada com as demais telas.  
+**Fix:** Substituir por `colors.dark.background` (já disponível em `@theme/colors`) e tokens equivalentes para tint/inactive.
 
-**Evidence:** `src/features/auth/hooks/useAuth.ts` only re-exports `useAuthStore`.  
-**Impact:** Minor indirection; could hide future auth logic if not expanded.  
-**Fix:** Either fold callers to `@store/authStore` or grow the hook with login/logout API orchestration.
+---
 
-## Low — Test coverage scope
+## Low — `useAuth` hook é um pass-through
 
-**Evidence:** Only `__tests__/LoginScreen.test.tsx` and `__tests__/App.test.tsx`; no coverage for navigators, `apiClient`, or feed.  
-**Impact:** Regressions in auth gating or HTTP behavior may go unnoticed.  
-**Fix:** Add integration-style tests with MSW or mocked Axios for `fetchFeedItems` and 401 handling; shallow tests for `RootNavigator` branching.
+**Evidência:** `src/features/auth/hooks/useAuth.ts` apenas re-exporta `useAuthStore`.  
+**Impacto:** Indireção mínima; pode esconder lógica futura de orquestração se não for expandida.  
+**Fix:** Ou consolidar callers em `@store/authStore`, ou crescer o hook com login/logout via API.
 
-## Low — Environment empty string base URL
+---
 
-**Evidence:** `apiClient` uses `baseURL: env.apiUrl || undefined`; misconfiguration yields relative URLs or failed requests depending on platform.  
-**Impact:** Subtle runtime failures if `EXPO_PUBLIC_API_URL` / native config is missing.  
-**Fix:** Optional dev-only assertion or startup log when `apiUrl` is empty in non-test builds.
+## Low — Base URL vazia produz URLs relativas silenciosamente
+
+**Evidência:** `apiClient` usa `baseURL: env.apiUrl || undefined`; configuração incorreta resulta em URLs relativas ou falhas de request dependendo da plataforma.  
+**Impacto:** Falhas sutis em runtime se `EXPO_PUBLIC_API_URL` / native config estiver ausente.  
+**Fix:** Asserção ou log de inicialização opcional quando `apiUrl` estiver vazio em builds que não sejam de teste.
+
+---
+
+## Low — Dual lockfiles
+
+**Evidência:** `package-lock.json` e `yarn.lock` presentes na raiz do projeto.  
+**Impacto:** Instalações inconsistentes entre máquinas e CI.  
+**Fix:** Escolher npm ou Yarn, remover o lockfile do outro, e documentar a escolha no onboarding.
+
+---
+
+## Resolvido ✓ — Auth real implementada
+
+_(Anteriormente High)_ `authApi.ts` e `LoginScreen` agora chamam `POST /public/login`; token e `user` são persistidos via `useAuthStore.setSession`.
+
+## Resolvido ✓ — Feed wired com API real
+
+_(Anteriormente High)_ `useFeed` / `useExploreFeed` são queries infinitas ativas; `FeedScreen` consome `useFeed()`, `useLikedPosts()` e `useFeedMutations()` com optimistic updates.

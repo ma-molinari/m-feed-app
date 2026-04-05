@@ -10,21 +10,21 @@ seguro via JWT e timeline contextualizada (seguindo vs. descoberta).
 ## Goals
 
 - [x] Autenticação funcional conectada ao backend JWT com taxa de erro < 1%
-- [ ] Timeline personalizada (For You) e de descoberta (Explore) navegáveis
-- [ ] Criação e edição de posts com upload de imagem sem erros
-- [ ] Busca de usuários por nome ou nickname com debounce ≤ 300 ms
-- [ ] Follow/unfollow com reflexo na tab For You na próxima atualização
-- [ ] Experiência visual consistente em dark mode em todas as telas
+- [x] Timeline personalizada (For You) e de descoberta (Explore) navegáveis
+- [x] Criação e edição de posts com upload de imagem sem erros
+- [x] Busca de usuários por nome ou nickname com debounce ≤ 300 ms
+- [x] Follow/unfollow com reflexo na tab For You na próxima atualização
+- [x] Experiência visual consistente em dark mode em todas as telas
 
 ## Out of Scope
 
-| Feature | Reason |
-|---|---|
-| Notificações push (SSE `/api/notifications`) | `EventSource` não envia header JWT por padrão; excluído da v1 |
-| Stories, vídeos, mídia além de imagem estática | Fora do escopo de produto v1 |
-| Feed algorítmico | Ordenação é estritamente cronológica (id desc) |
-| Sistema de mensagens diretas (DM) | Fora do escopo de produto v1 |
-| Moderação de conteúdo | Fora do escopo de produto v1 |
+| Feature                                        | Reason                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------- |
+| Notificações push (SSE `/api/notifications`)   | `EventSource` não envia header JWT por padrão; excluído da v1 |
+| Stories, vídeos, mídia além de imagem estática | Fora do escopo de produto v1                                  |
+| Feed algorítmico                               | Ordenação é estritamente cronológica (id desc)                |
+| Sistema de mensagens diretas (DM)              | Fora do escopo de produto v1                                  |
+| Moderação de conteúdo                          | Fora do escopo de produto v1                                  |
 
 ---
 
@@ -79,13 +79,13 @@ gravado no MMKV.
 **Acceptance Criteria:**
 
 - [x] WHEN o usuário preenche email, username (≥ 3 chars), fullName (≥ 1 char) e password
-  (≥ 6 chars) e submete THEN o sistema SHALL chamar `POST /public/register`
+      (≥ 6 chars) e submete THEN o sistema SHALL chamar `POST /public/register`
 - [x] WHEN a API retorna 201 THEN o sistema SHALL redirecionar para a tela de Login com
-  mensagem de sucesso
+      mensagem de sucesso
 - [x] WHEN a API retorna 400 (e-mail ou username já usados) THEN o sistema SHALL exibir
-  mensagem de erro legível
+      mensagem de erro legível
 - [x] WHEN qualquer campo obrigatório estiver inválido THEN o sistema SHALL bloquear o submit
-  e exibir validação inline
+      e exibir validação inline
 
 **Independent Test:** Cadastrar usuário com dados únicos → redireciona para Login.
 
@@ -406,55 +406,55 @@ inclui posts dele na próxima atualização.
 
 ## Requirement Traceability
 
-| Requirement ID | Story | Layout Ref | Status |
-|---|---|---|---|
-| AUTH-01 | AUTH-LOGIN | layout-login | Done |
-| AUTH-02 | AUTH-LOGIN | layout-login | Done |
-| AUTH-03 | AUTH-LOGIN / AUTH-REGISTER | layout-login | Done |
-| AUTH-04 | AUTH-LOGIN | layout-login | Done |
-| AUTH-05 | AUTH-LOGIN / AUTH-REGISTER | layout-login | Done |
-| AUTH-06 | AUTH-LOGIN | — | Done |
-| NAV-01 | NAV-BOTTOMTABS | layout-home | Done |
-| NAV-02 | NAV-BOTTOMTABS | layout-home | Done |
-| NAV-03 | NAV-BOTTOMTABS | layout-home | Done |
-| HOME-01 | HOME-FORYOU / HOME-EXPLORE | layout-home | Done |
-| HOME-02 | HOME-FORYOU | layout-home | Done |
-| HOME-03 | HOME-EXPLORE | layout-home | Pending |
-| HOME-04 | HOME-FORYOU | layout-home | Done |
-| HOME-05 | HOME-FORYOU | layout-home | Done |
-| HOME-06 | HOME-FORYOU | layout-home-post-options-sheet | Done |
-| HOME-07 | HOME-FORYOU / HOME-EXPLORE | layout-home | Done |
-| HOME-08 | HOME-FORYOU / HOME-EXPLORE | layout-loading-home | Done |
-| POST-01 | POST-DETAIL | layout-post-detail | Pending |
-| POST-02 | POST-DETAIL | layout-post-detail | Pending |
-| POST-03 | POST-DETAIL | layout-post-detail | Pending |
-| POST-04 | POST-DETAIL | layout-post-detail | Pending |
-| POST-05 | POST-DETAIL | layout-post-detail | Pending |
-| SEARCH-01 | SEARCH-USERS | layout-search-screen | Pending |
-| SEARCH-02 | SEARCH-USERS | layout-search-screen | Pending |
-| SEARCH-03 | SEARCH-USERS | layout-search-screen | Pending |
-| SEARCH-04 | SEARCH-USERS | layout-search-screen | Pending |
-| SEARCH-05 | SEARCH-USERS | layout-search-screen | Pending |
-| SEARCH-06 | SEARCH-USERS | layout-search-screen | Pending |
-| CREATE-01 | CREATE-POST | layout-create-post | Pending |
-| CREATE-02 | CREATE-POST | layout-create-post | Pending |
-| CREATE-03 | CREATE-POST | layout-create-post | Pending |
-| CREATE-04 | CREATE-POST | layout-create-post | Pending |
-| CREATE-05 | CREATE-POST / CREATE-EDIT | layout-create-post | Pending |
-| PROFILE-01 | PROFILE-OWN / PROFILE-OTHER | layout-private-profile / layout-public-profile | Pending |
-| PROFILE-02 | PROFILE-OWN / PROFILE-OTHER | layout-private-profile / layout-public-profile | Pending |
-| PROFILE-03 | PROFILE-OTHER | layout-public-profile | Pending |
-| PROFILE-04 | PROFILE-OTHER | layout-public-profile | Pending |
-| PROFILE-05 | PROFILE-OWN | layout-confirm-logout | Pending |
-| PROFILE-06 | PROFILE-OWN | layout-edit-profile / layout-edit-password | Pending |
-| PROFILE-07 | PROFILE-OWN / PROFILE-OTHER | layout-loading-profile | Pending |
-| NFR-01 | All | All layouts | Pending |
-| NFR-02 | All data-dependent | layout-loading-home / layout-loading-profile | Pending |
-| NFR-03 | All | All layouts | Pending |
-| NFR-04 | HOME, POST-DETAIL, PROFILE | layout-home / layout-post-detail / layout-private-profile | Pending |
-| NFR-05 | All authenticated | — | Pending |
-| NFR-06 | All | — | Pending |
-| NFR-07 | All | All layouts | Pending |
+| Requirement ID | Story                       | Layout Ref                                                | Status  |
+| -------------- | --------------------------- | --------------------------------------------------------- | ------- |
+| AUTH-01        | AUTH-LOGIN                  | layout-login                                              | Done    |
+| AUTH-02        | AUTH-LOGIN                  | layout-login                                              | Done    |
+| AUTH-03        | AUTH-LOGIN / AUTH-REGISTER  | layout-login                                              | Done    |
+| AUTH-04        | AUTH-LOGIN                  | layout-login                                              | Done    |
+| AUTH-05        | AUTH-LOGIN / AUTH-REGISTER  | layout-login                                              | Done    |
+| AUTH-06        | AUTH-LOGIN                  | —                                                         | Done    |
+| NAV-01         | NAV-BOTTOMTABS              | layout-home                                               | Done    |
+| NAV-02         | NAV-BOTTOMTABS              | layout-home                                               | Done    |
+| NAV-03         | NAV-BOTTOMTABS              | layout-home                                               | Done    |
+| HOME-01        | HOME-FORYOU / HOME-EXPLORE  | layout-home                                               | Done    |
+| HOME-02        | HOME-FORYOU                 | layout-home                                               | Done    |
+| HOME-03        | HOME-EXPLORE                | layout-home                                               | Pending |
+| HOME-04        | HOME-FORYOU                 | layout-home                                               | Done    |
+| HOME-05        | HOME-FORYOU                 | layout-home                                               | Done    |
+| HOME-06        | HOME-FORYOU                 | layout-home-post-options-sheet                            | Done    |
+| HOME-07        | HOME-FORYOU / HOME-EXPLORE  | layout-home                                               | Done    |
+| HOME-08        | HOME-FORYOU / HOME-EXPLORE  | layout-loading-home                                       | Done    |
+| POST-01        | POST-DETAIL                 | layout-post-detail                                        | Pending |
+| POST-02        | POST-DETAIL                 | layout-post-detail                                        | Pending |
+| POST-03        | POST-DETAIL                 | layout-post-detail                                        | Pending |
+| POST-04        | POST-DETAIL                 | layout-post-detail                                        | Pending |
+| POST-05        | POST-DETAIL                 | layout-post-detail                                        | Pending |
+| SEARCH-01      | SEARCH-USERS                | layout-search-screen                                      | Pending |
+| SEARCH-02      | SEARCH-USERS                | layout-search-screen                                      | Pending |
+| SEARCH-03      | SEARCH-USERS                | layout-search-screen                                      | Pending |
+| SEARCH-04      | SEARCH-USERS                | layout-search-screen                                      | Pending |
+| SEARCH-05      | SEARCH-USERS                | layout-search-screen                                      | Pending |
+| SEARCH-06      | SEARCH-USERS                | layout-search-screen                                      | Pending |
+| CREATE-01      | CREATE-POST                 | layout-create-post                                        | Pending |
+| CREATE-02      | CREATE-POST                 | layout-create-post                                        | Pending |
+| CREATE-03      | CREATE-POST                 | layout-create-post                                        | Pending |
+| CREATE-04      | CREATE-POST                 | layout-create-post                                        | Pending |
+| CREATE-05      | CREATE-POST / CREATE-EDIT   | layout-create-post                                        | Pending |
+| PROFILE-01     | PROFILE-OWN / PROFILE-OTHER | layout-private-profile / layout-public-profile            | Pending |
+| PROFILE-02     | PROFILE-OWN / PROFILE-OTHER | layout-private-profile / layout-public-profile            | Pending |
+| PROFILE-03     | PROFILE-OTHER               | layout-public-profile                                     | Pending |
+| PROFILE-04     | PROFILE-OTHER               | layout-public-profile                                     | Pending |
+| PROFILE-05     | PROFILE-OWN                 | layout-confirm-logout                                     | Pending |
+| PROFILE-06     | PROFILE-OWN                 | layout-edit-profile / layout-edit-password                | Pending |
+| PROFILE-07     | PROFILE-OWN / PROFILE-OTHER | layout-loading-profile                                    | Pending |
+| NFR-01         | All                         | All layouts                                               | Pending |
+| NFR-02         | All data-dependent          | layout-loading-home / layout-loading-profile              | Pending |
+| NFR-03         | All                         | All layouts                                               | Pending |
+| NFR-04         | HOME, POST-DETAIL, PROFILE  | layout-home / layout-post-detail / layout-private-profile | Pending |
+| NFR-05         | All authenticated           | —                                                         | Pending |
+| NFR-06         | All                         | —                                                         | Pending |
+| NFR-07         | All                         | All layouts                                               | Pending |
 
 **Coverage:** 46 requisitos mapeados · 0 não mapeados
 
@@ -462,11 +462,11 @@ inclui posts dele na próxima atualização.
 
 ## API Discrepancies (vs PRD / Layout)
 
-| Fonte | Layout/PRD | API Real | Decisão |
-|---|---|---|---|
-| layout-create-post | Campo "Title" explícito no formulário | `POST /api/posts` aceita só `{ image, content }` — sem title | **Sem campo Title** — spec adota contrato real da API |
-| overview.md | Edição atualiza campos completos | `PUT /api/posts/:id` só atualiza `content`; imagem inalterável | **Só content editável** — spec reflete limitação da API |
-| overview.md | `GET /api/users/search?q=` | Parâmetro real é `query`, não `q` | **Usar `query`** conforme API real |
+| Fonte              | Layout/PRD                            | API Real                                                       | Decisão                                                 |
+| ------------------ | ------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------- |
+| layout-create-post | Campo "Title" explícito no formulário | `POST /api/posts` aceita só `{ image, content }` — sem title   | **Sem campo Title** — spec adota contrato real da API   |
+| overview.md        | Edição atualiza campos completos      | `PUT /api/posts/:id` só atualiza `content`; imagem inalterável | **Só content editável** — spec reflete limitação da API |
+| overview.md        | `GET /api/users/search?q=`            | Parâmetro real é `query`, não `q`                              | **Usar `query`** conforme API real                      |
 
 ---
 

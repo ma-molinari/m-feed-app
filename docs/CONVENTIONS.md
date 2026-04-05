@@ -4,54 +4,60 @@
 
 **Files:**
 
-- React screens: `PascalCase` + `Screen` suffix — e.g. `LoginScreen.tsx`, `FeedScreen.tsx`, `RegisterScreen.tsx`
-- Hooks: `camelCase` with `use` prefix — `useFeedItems.ts`
-- API modules: `camelCase` — `authApi.ts`, `feedApi.ts`
+- React screens: `PascalCase` + sufixo `Screen` — ex: `LoginScreen.tsx`, `FeedScreen.tsx`, `PostDetailScreen.tsx`, `UserProfileScreen.tsx`
+- Hooks: `camelCase` com prefixo `use` — `useFeed.ts`, `useFeedMutations.ts`, `useMyProfile.ts`, `useFollowUser.ts`
+- Módulos de API: `camelCase` — `authApi.ts`, `feedApi.ts`, `createApi.ts`, `profileApi.ts`, `searchApi.ts`
 - Store: `authStore.ts`, `mmkvStorage.ts`
 
 **Functions/Methods:**
 
-- Exported components: `PascalCase` — `LoginScreen`, `RemoteImage`, `RootNavigator`
-- Hooks and helpers: `camelCase` — `useFeedItems`, `fetchFeedItems`, `readNativeConfig`
-- Zustand actions: `camelCase` — `setToken`, `signOut`
+- Componentes exportados: `PascalCase` — `FeedScreen`, `PostCard`, `RemoteImage`, `MainAppShell`
+- Hooks e helpers: `camelCase` — `useFeed`, `fetchFeed`, `useCreatePost`, `readNativeConfig`
+- Actions do Zustand: `camelCase` — `setSession`, `signOut`
 
 **Variables:**
 
-- React state setters: `setX` + `camelCase` value names — `emailOrUsername`, `setPassword`
-- Navigation types: `*Navigation` — `LoginNavigation`, `RegisterNavigation`
+- State setters do React: `setX` + nomes `camelCase` — `emailOrUsername`, `setPassword`, `setIsLoading`
+- Tipos de navegação: `*Navigation` — `LoginNavigation`, `RegisterNavigation`
 
 **Constants:**
 
-- Style keys and layout ratios: `SCREAMING_SNAKE` for module-level constants — `SHEET_HEIGHT_RATIO`, `PLACEHOLDER`
-- Theme tokens: `camelCase` keys inside exported objects — `colors.background`, `spacing.lg`
+- Constantes de módulo: `SCREAMING_SNAKE` — `FEED_PAGE_SIZE`, `FEED_FOR_YOU_KEY`, `LIKED_POSTS_KEY`
+- Tokens de tema: chaves `camelCase` dentro de objetos exportados — `colors.dark.background`, `spacing.lg`
 
 ## Code Organization
 
 **Import/Dependency declaration:**
 
-- External packages first (React, RN, third-party), then blank line, then internal aliases (`@theme`, `@store`, `@navigation`, relative `../`).
-- Example from `LoginScreen.tsx`: `react` → `react-native` → `expo-image` / navigation / safe area → `@store`, `@theme` → `@navigation/types` → relative asset `require`.
+- Pacotes externos primeiro (React, RN, terceiros), depois linha em branco, depois aliases internos (`@theme`, `@store`, `@features`, relativos `../`).
+- Exemplo em `FeedScreen.tsx`: `react` → `@tanstack/react-query` → `@shopify/flash-list` → `@features/feed/…` → `@theme/…`
 
 **File structure:**
 
-- Screens: hooks (`useState`, `useCallback`, `useMemo`) near top; component; `StyleSheet.create` at bottom in same file.
-- Small feature `store` barrels re-export from global store — `src/features/auth/store/index.ts` exports `useAuthStore` from `@store/authStore`.
+- Screens: hooks (`useState`, `useCallback`, `useMemo`, React Query) perto do topo; componente retornado; `StyleSheet.create` ao final no mesmo arquivo.
+- Hooks de mutation: `useMutation` com `onMutate`/`onError` para optimistic updates; lógica de rollback encapsulada.
+- Pequenos barrels de feature `store/index.ts` re-exportam do store global — `src/features/auth/store/index.ts` exporta `useAuthStore` de `@store/authStore`.
+
+**Auth — onde importar:** prefira `@store/authStore` para `useAuthStore`, `setSession` e `signOut`. O barrel `@features/auth/store` e o hook `useAuth` (`@features/auth/hooks/useAuth`) apenas re-exportam o mesmo store; use um estilo consistente em código novo (import direto do `@store/authStore` é o mais explícito). Não há migração em lote obrigatória dos imports antigos.
 
 ## Type Safety / Documentation
 
-**Approach:** Strict TypeScript; explicit param lists for navigation (`NativeStackNavigationProp<AuthStackParamList, 'Login'>`).  
-Nav param lists live in `src/navigation/types.ts` (`AuthStackParamList`, `MainStackParamList`).
+**Approach:** TypeScript estrito; listas de params de navegação em `src/navigation/types.ts`.  
+Envelopes de API tipados localmente por feature (ex: `type ApiEnvelope<T> = { data: T }` em `feedApi.ts` e `profileApi.ts`).
 
-**Shared utility type:** `Result<T, E>` in `src/shared/types/index.ts` (discriminated union) — available for future error handling; not heavily used in sampled files.
+**Tipo de auth:** `AuthUser` definido em `src/features/auth/types/index.ts`; armazenado tanto no `authStore` quanto retornado pela API de login.
 
-**Documentation:** Occasional JSDoc on modules (e.g. `authApi.ts` describes HTTP contracts); inline comments for non-obvious choices (e.g. bundled hero image eslint disable, MMKV/native config).
+**Shared utility type:** `Result<T, E>` em `src/shared/types/index.ts` (union discriminada) — disponível mas não amplamente utilizado nos arquivos amostrados.
+
+**Documentation:** JSDoc ocasional em módulos (ex: `authApi.ts` descreve contratos HTTP); comentários inline para escolhas não óbvias (ex: `skipGlobal401Handler`, fallback MMKV).
 
 ## Error Handling
 
-**Pattern:** Axios errors propagate from `apiClient`; 401 handled in response interceptor (side effect: `signOut`). Callers of `fetchFeedItems` would reject on network/API errors unless wrapped.  
-**MMKV:** `createMMKV` wrapped in try/catch; silent fallback to memory storage.
+**Pattern:** Erros Axios propagam de `apiClient`; 401 tratado no interceptor de response (efeito colateral: `signOut`). Requests de auth passam `skipGlobal401Handler: true` para não ser interceptados.  
+**Mutations:** `onError` de `useMutation` reverte snapshot do cache (ex: `useFeedMutations`).  
+**MMKV:** `createMMKV` dentro de try/catch; fallback silencioso para storage in-memory.
 
 ## Comments / Documentation
 
-**Style:** Portuguese UI strings mixed with English marketing copy on login (`Log in.` / `Welcome back` vs `Sair` on feed). Code comments in English or Portuguese depending on file.  
-**ESLint:** Targeted disables with reasons — e.g. `no-require-imports` for `react-native-config` and bundled image.
+**Style:** Strings de UI em português; comentários de código em inglês ou português dependendo do arquivo. Sem regra estrita de língua única.  
+**ESLint:** Disables pontuais com razão — ex: `no-require-imports` para `react-native-config` e imagem bundled.

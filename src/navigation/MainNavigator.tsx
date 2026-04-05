@@ -1,15 +1,11 @@
-import { View } from 'react-native';
 import { createStaticNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { PostDetailScreen } from '@features/feed/screens/PostDetailScreen';
 import { EditPostScreen } from '@features/create/screens/EditPostScreen';
+import { UserProfileScreen } from '@features/profile/screens/UserProfileScreen';
 
 import { MainTabNavigator } from './TabNavigator';
-
-function StackPlaceholderScreen() {
-  return <View style={{ flex: 1, backgroundColor: '#000000' }} />;
-}
 
 const MainStack = createNativeStackNavigator({
   initialRouteName: 'Tabs',
@@ -27,7 +23,7 @@ const MainStack = createNativeStackNavigator({
       options: { headerShown: false },
     },
     UserProfile: {
-      screen: StackPlaceholderScreen,
+      screen: UserProfileScreen,
       options: { headerShown: false },
     },
   },

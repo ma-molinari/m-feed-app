@@ -3,6 +3,7 @@ import { createStaticNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { PostDetailScreen } from '@features/feed/screens/PostDetailScreen';
+import { EditPostScreen } from '@features/create/screens/EditPostScreen';
 
 import { MainTabNavigator } from './TabNavigator';
 
@@ -22,7 +23,7 @@ const MainStack = createNativeStackNavigator({
       options: { headerShown: false },
     },
     EditPost: {
-      screen: StackPlaceholderScreen,
+      screen: EditPostScreen,
       options: { headerShown: false },
     },
     UserProfile: {

@@ -3,6 +3,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { RegisterScreen } from '../src/features/auth/screens/RegisterScreen';
 
+import { axiosLikeError } from './helpers/axiosLikeError';
+
 const mockNavigate = jest.fn();
 const mockRegister = jest.fn();
 
@@ -19,22 +21,6 @@ jest.mock('@react-navigation/native', () => {
 jest.mock('@features/auth/services/authApi', () => ({
   register: (...args: unknown[]) => mockRegister(...args),
 }));
-
-function axiosLikeError(status: number, data?: object) {
-  return {
-    isAxiosError: true,
-    name: 'AxiosError',
-    message: 'fail',
-    response: {
-      status,
-      data: data ?? {},
-      statusText: 'Error',
-      headers: {},
-      config: {},
-    },
-    config: {},
-  };
-}
 
 const safeAreaMetrics = {
   frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -57,8 +43,8 @@ describe('RegisterScreen', () => {
 
   it('renders headline and form fields', () => {
     renderRegister();
-    expect(screen.getByText('Sign up.')).toBeTruthy();
     expect(screen.getByText('Create your M-Feed account')).toBeTruthy();
+    expect(screen.getByText('Already have an account? ')).toBeTruthy();
     expect(screen.getByLabelText('E-mail')).toBeTruthy();
     expect(screen.getByLabelText('Username')).toBeTruthy();
     expect(screen.getByLabelText('Full name')).toBeTruthy();
@@ -76,10 +62,10 @@ describe('RegisterScreen', () => {
   it('blocks submit and shows inline errors when all fields are empty', () => {
     renderRegister();
     fireEvent.press(screen.getByLabelText('Create account'));
-    expect(screen.getByText('Informe o e-mail.')).toBeTruthy();
-    expect(screen.getByText('Informe o nome de usuário.')).toBeTruthy();
-    expect(screen.getByText('Informe o nome completo.')).toBeTruthy();
-    expect(screen.getByText('Informe a senha.')).toBeTruthy();
+    expect(screen.getByText('Enter your email.')).toBeTruthy();
+    expect(screen.getByText('Enter a username.')).toBeTruthy();
+    expect(screen.getByText('Enter your full name.')).toBeTruthy();
+    expect(screen.getByText('Enter your password.')).toBeTruthy();
     expect(mockRegister).not.toHaveBeenCalled();
   });
 
@@ -90,9 +76,7 @@ describe('RegisterScreen', () => {
     fireEvent.changeText(screen.getByLabelText('Full name'), 'Name');
     fireEvent.changeText(screen.getByLabelText('Password'), 'secret12');
     fireEvent.press(screen.getByLabelText('Create account'));
-    expect(
-      screen.getByText('O nome de usuário deve ter pelo menos 3 caracteres.'),
-    ).toBeTruthy();
+    expect(screen.getByText('Username must be at least 3 characters.')).toBeTruthy();
     expect(mockRegister).not.toHaveBeenCalled();
   });
 
@@ -103,7 +87,7 @@ describe('RegisterScreen', () => {
     fireEvent.changeText(screen.getByLabelText('Full name'), 'Name');
     fireEvent.changeText(screen.getByLabelText('Password'), '12345');
     fireEvent.press(screen.getByLabelText('Create account'));
-    expect(screen.getByText('A senha deve ter pelo menos 6 caracteres.')).toBeTruthy();
+    expect(screen.getByText('Password must be at least 6 characters.')).toBeTruthy();
     expect(mockRegister).not.toHaveBeenCalled();
   });
 
@@ -117,7 +101,7 @@ describe('RegisterScreen', () => {
     fireEvent.press(screen.getByLabelText('Create account'));
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('Login', {
-        successMessage: 'Conta criada! Faça login para continuar.',
+        successMessage: 'Account created. Sign in to continue.',
       });
     });
     expect(mockRegister).toHaveBeenCalledWith({

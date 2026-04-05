@@ -3,6 +3,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { LoginScreen } from '../src/features/auth/screens/LoginScreen';
 
+import { axiosLikeError } from './helpers/axiosLikeError';
+
 const mockNavigate = jest.fn();
 const mockSetSession = jest.fn();
 const mockLogin = jest.fn();
@@ -31,23 +33,6 @@ jest.mock('@features/auth/services/authApi', () => ({
   login: (...args: unknown[]) => mockLogin(...args),
 }));
 
-/** Plain object: `axios.isAxiosError` only checks `isAxiosError === true` (avoid importing axios in Jest). */
-function axiosLikeError(status: number, data?: object) {
-  return {
-    isAxiosError: true,
-    name: 'AxiosError',
-    message: 'fail',
-    response: {
-      status,
-      data: data ?? {},
-      statusText: 'Error',
-      headers: {},
-      config: {},
-    },
-    config: {},
-  };
-}
-
 const safeAreaMetrics = {
   frame: { x: 0, y: 0, width: 390, height: 844 },
   insets: { top: 47, left: 0, right: 0, bottom: 34 },
@@ -70,9 +55,8 @@ describe('LoginScreen', () => {
 
   it('shows login headline and form actions', () => {
     renderLogin();
-    expect(screen.getByText('Log in.')).toBeTruthy();
     expect(screen.getByText('Welcome back to M-Feed')).toBeTruthy();
-    expect(screen.getByLabelText('Submit')).toBeTruthy();
+    expect(screen.getByLabelText('Sign in')).toBeTruthy();
     expect(screen.getByLabelText('Sign up')).toBeTruthy();
   });
 
@@ -84,9 +68,9 @@ describe('LoginScreen', () => {
 
   it('blocks submit and shows inline errors when fields are empty', () => {
     renderLogin();
-    fireEvent.press(screen.getByLabelText('Submit'));
-    expect(screen.getByText('Informe e-mail ou usuário.')).toBeTruthy();
-    expect(screen.getByText('Informe a senha.')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Sign in'));
+    expect(screen.getByText('Enter your email or username.')).toBeTruthy();
+    expect(screen.getByText('Enter your password.')).toBeTruthy();
     expect(mockLogin).not.toHaveBeenCalled();
     expect(mockSetSession).not.toHaveBeenCalled();
   });
@@ -99,7 +83,7 @@ describe('LoginScreen', () => {
     renderLogin();
     fireEvent.changeText(screen.getByLabelText('E-mail or Username'), 'user@test.com');
     fireEvent.changeText(screen.getByLabelText('Password'), 'secret12');
-    fireEvent.press(screen.getByLabelText('Submit'));
+    fireEvent.press(screen.getByLabelText('Sign in'));
     await waitFor(() => {
       expect(mockSetSession).toHaveBeenCalledWith({
         token: 'jwt-token',
@@ -114,7 +98,7 @@ describe('LoginScreen', () => {
     renderLogin();
     fireEvent.changeText(screen.getByLabelText('E-mail or Username'), 'x');
     fireEvent.changeText(screen.getByLabelText('Password'), 'y');
-    fireEvent.press(screen.getByLabelText('Submit'));
+    fireEvent.press(screen.getByLabelText('Sign in'));
     await waitFor(() => {
       expect(screen.getByText('Credenciais inválidas')).toBeTruthy();
     });
@@ -126,7 +110,7 @@ describe('LoginScreen', () => {
     renderLogin();
     fireEvent.changeText(screen.getByLabelText('E-mail or Username'), 'bad');
     fireEvent.changeText(screen.getByLabelText('Password'), 'secret12');
-    fireEvent.press(screen.getByLabelText('Submit'));
+    fireEvent.press(screen.getByLabelText('Sign in'));
     await waitFor(() => {
       expect(screen.getByText('E-mail inválido')).toBeTruthy();
     });

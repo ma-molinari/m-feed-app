@@ -21,3 +21,10 @@ jest.mock('expo-image', () => {
     Image: (props) => React.createElement(View, { ...props, testID: 'expo-image' }),
   };
 });
+
+jest.mock('@expo/vector-icons', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  const MockIcon = (props) => React.createElement(Text, { ...props, testID: `icon-${props.name}` }, 'icon');
+  return { Ionicons: MockIcon };
+});

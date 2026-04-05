@@ -1,7 +1,7 @@
 /** @type {import('expo/config').ExpoConfig} */
 module.exports = ({ config }) => ({
   ...config,
-  name: 'm-feed-app',
+  name: 'M-Feed',
   slug: 'm-feed-app',
   extra: {
     ...config.extra,

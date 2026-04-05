@@ -4,6 +4,24 @@ import { env } from '@constants/env';
 
 const GENERIC = 'Não foi possível concluir a operação. Tente novamente.';
 
+/** Thrown when `env.apiUrl` is empty and a request would leave the client without a base URL. */
+export class MissingApiUrlError extends Error {
+  constructor() {
+    super(
+      'API não configurada. Defina EXPO_PUBLIC_API_URL no .env ou em extra (veja docs/INTEGRATIONS.md). Reinicie o Metro com -c após alterar .env.',
+    );
+    this.name = 'MissingApiUrlError';
+  }
+}
+
+/** Thrown when `POST /public/login` returns a body without a usable token and user id. */
+export class InvalidLoginResponseError extends Error {
+  constructor() {
+    super('Resposta de login inválida. Tente novamente ou atualize o app.');
+    this.name = 'InvalidLoginResponseError';
+  }
+}
+
 function isAxiosError(payload: unknown): payload is AxiosError {
   return (
     typeof payload === 'object' &&
@@ -27,8 +45,14 @@ function extract400Message(data: unknown): string | undefined {
   return undefined;
 }
 
+/** Where the error is shown: adjusts 401 copy (login form vs authenticated session). */
+export type ApiErrorContext = 'login' | 'authenticated';
+
 /** Maps Axios/network failures to a single string for the UI (AUTH-03/04 + edge cases). */
-export function getApiErrorMessage(error: unknown): string {
+export function getApiErrorMessage(error: unknown, context?: ApiErrorContext): string {
+  if (error instanceof MissingApiUrlError || error instanceof InvalidLoginResponseError) {
+    return error.message;
+  }
   if (!isAxiosError(error)) {
     return GENERIC;
   }
@@ -37,6 +61,9 @@ export function getApiErrorMessage(error: unknown): string {
   const body = error.response?.data;
 
   if (status === 401) {
+    if (context === 'authenticated') {
+      return 'Sessão expirada. Faça login novamente.';
+    }
     return 'Credenciais inválidas';
   }
 

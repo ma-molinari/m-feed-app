@@ -1,12 +1,14 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 
+import { userPostsQueryKey } from '@features/feed/queryKeys';
+
 import { fetchUserPosts } from '../services/profileApi';
 
 const PAGE_SIZE = 12;
 
 export function useUserPosts(userId: number) {
   return useInfiniteQuery({
-    queryKey: ['users', userId, 'posts'],
+    queryKey: userPostsQueryKey(userId),
     enabled: userId > 0,
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>

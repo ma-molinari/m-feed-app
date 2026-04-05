@@ -1,18 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useMemo } from 'react';
 
+import { feedKeys } from '../queryKeys';
 import { fetchLikedPosts } from '../services/feedApi';
 
 export function useLikedPosts() {
   const query = useQuery({
-    queryKey: ['feed', 'likedPosts'],
+    queryKey: feedKeys.likedPosts(),
     queryFn: fetchLikedPosts,
   });
 
-  const isLiked = useCallback(
-    (postId: number) => (query.data ?? []).includes(postId),
-    [query.data],
-  );
+  const likedIdSet = useMemo(() => new Set(query.data ?? []), [query.data]);
 
-  return { ...query, isLiked };
+  return { ...query, likedIdSet };
 }

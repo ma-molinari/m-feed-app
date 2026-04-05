@@ -1,21 +1,25 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { HomeTabNavigation } from '@navigation/types';
+import { confirmSignOut } from '@features/auth/utils/confirmSignOut';
 import { RemoteImage } from '@shared/components/RemoteImage';
 import { useAuthStore } from '@store/authStore';
 import { colors } from '@theme/colors';
@@ -28,10 +32,11 @@ import { useUpdatePassword } from '../hooks/useUpdatePassword';
 import { useUpdateProfile } from '../hooks/useUpdateProfile';
 import { useUserPosts } from '../hooks/useUserPosts';
 import type { PostWithAuthor } from '../types';
+import { env } from '@/constants/env';
 
-const { width } = Dimensions.get('window');
 const GRID_COLS = 2;
-const TILE_SIZE = width / GRID_COLS;
+const GRID_GUTTER = 2;
+const MIN_NEW_PASSWORD_LENGTH = 6;
 
 const d = colors.dark;
 
@@ -48,8 +53,28 @@ function AvatarPlaceholder({ name, size }: { name: string; size: number }) {
   );
 }
 
-function SkeletonBlock({ width: w, height: h, style }: { width: number | string; height: number; style?: object }) {
-  return <View style={[{ width: w as number, height: h, borderRadius: radii.input, backgroundColor: d.skeletonBase }, style]} />;
+function SkeletonBlock({
+  width: w,
+  height: h,
+  style,
+}: {
+  width: number | string;
+  height: number;
+  style?: object;
+}) {
+  return (
+    <View
+      style={[
+        {
+          width: w as number,
+          height: h,
+          borderRadius: radii.input,
+          backgroundColor: d.skeletonBase,
+        },
+        style,
+      ]}
+    />
+  );
 }
 
 function ProfileSkeleton() {
@@ -81,74 +106,120 @@ type EditProfileModalProps = {
 };
 
 function EditProfileModal({ visible, onClose, initialValues }: EditProfileModalProps) {
+  const insets = useSafeAreaInsets();
   const [fullName, setFullName] = useState(initialValues.fullName);
   const [username, setUsername] = useState(initialValues.username);
   const [bio, setBio] = useState(initialValues.bio);
+  const [focusedField, setFocusedField] = useState<'fullName' | 'username' | 'bio' | null>(null);
   const updateProfile = useUpdateProfile();
 
   const handleSave = useCallback(() => {
     updateProfile.mutate(
       { fullName, username, bio },
       {
-        onSuccess: () => onClose(),
+        onSuccess: () => {
+          onClose();
+          Alert.alert('Sucesso', 'Perfil atualizado.');
+        },
         onError: () => Alert.alert('Erro', 'Não foi possível salvar o perfil.'),
       },
     );
   }, [fullName, username, bio, updateProfile, onClose]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalSheet}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>Editar Perfil</Text>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      presentationStyle="overFullScreen"
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+      >
+        <ScrollView
+          style={styles.modalScroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.modalScrollContent}
+        >
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + spacing.md }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Editar perfil</Text>
 
-          <Text style={styles.fieldLabel}>Nome completo</Text>
-          <TextInput
-            style={styles.input}
-            value={fullName}
-            onChangeText={setFullName}
-            placeholderTextColor={d.textMuted}
-            placeholder="Nome completo"
-          />
+            <Text style={styles.fieldLabel}>Nome completo</Text>
+            <TextInput
+              style={[
+                styles.sheetTextInput,
+                focusedField === 'fullName' && styles.sheetTextInputFocused,
+              ]}
+              value={fullName}
+              onChangeText={setFullName}
+              placeholderTextColor={d.textMuted}
+              placeholder="Seu nome"
+              onFocus={() => setFocusedField('fullName')}
+              onBlur={() => setFocusedField(null)}
+            />
 
-          <Text style={styles.fieldLabel}>Username</Text>
-          <TextInput
-            style={styles.input}
-            value={username}
-            onChangeText={setUsername}
-            placeholderTextColor={d.textMuted}
-            placeholder="username"
-            autoCapitalize="none"
-          />
+            <Text style={styles.fieldLabel}>Nome de usuário</Text>
+            <TextInput
+              style={[
+                styles.sheetTextInput,
+                focusedField === 'username' && styles.sheetTextInputFocused,
+              ]}
+              value={username}
+              onChangeText={setUsername}
+              placeholderTextColor={d.textMuted}
+              placeholder="usuario"
+              autoCapitalize="none"
+              autoCorrect={false}
+              onFocus={() => setFocusedField('username')}
+              onBlur={() => setFocusedField(null)}
+            />
 
-          <Text style={styles.fieldLabel}>Bio</Text>
-          <TextInput
-            style={[styles.input, styles.inputMultiline]}
-            value={bio}
-            onChangeText={setBio}
-            placeholderTextColor={d.textMuted}
-            placeholder="Bio"
-            multiline
-            numberOfLines={3}
-          />
+            <Text style={styles.fieldLabel}>Bio</Text>
+            <TextInput
+              style={[
+                styles.sheetTextInput,
+                styles.inputMultiline,
+                focusedField === 'bio' && styles.sheetTextInputFocused,
+              ]}
+              value={bio}
+              onChangeText={setBio}
+              placeholderTextColor={d.textMuted}
+              placeholder="Conte um pouco sobre você"
+              multiline
+              numberOfLines={3}
+              onFocus={() => setFocusedField('bio')}
+              onBlur={() => setFocusedField(null)}
+            />
 
-          <Pressable
-            style={[styles.saveButton, updateProfile.isPending && styles.buttonDisabled]}
-            onPress={handleSave}
-            disabled={updateProfile.isPending}
-          >
-            {updateProfile.isPending ? (
-              <ActivityIndicator color={d.text} size="small" />
-            ) : (
-              <Text style={styles.saveButtonText}>Salvar</Text>
-            )}
-          </Pressable>
-          <Pressable style={styles.cancelButton} onPress={onClose}>
-            <Text style={styles.cancelButtonText}>Cancelar</Text>
-          </Pressable>
-        </View>
-      </View>
+            <Pressable
+              style={[styles.saveButton, updateProfile.isPending && styles.buttonDisabled]}
+              onPress={handleSave}
+              disabled={updateProfile.isPending}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: updateProfile.isPending }}
+            >
+              {updateProfile.isPending ? (
+                <ActivityIndicator color={d.text} size="small" />
+              ) : (
+                <Text style={styles.saveButtonText}>Salvar</Text>
+              )}
+            </Pressable>
+            <Pressable
+              style={styles.cancelButton}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar edição do perfil"
+            >
+              <Text style={styles.cancelButtonText}>Cancelar</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -158,82 +229,204 @@ type EditPasswordModalProps = {
   onClose: () => void;
 };
 
+type SecurePasswordFieldProps = {
+  label: string;
+  value: string;
+  onChangeText: (t: string) => void;
+  visible: boolean;
+  onToggleVisible: () => void;
+  focused: boolean;
+  onFocus: () => void;
+  onBlur: () => void;
+};
+
+function SecurePasswordField({
+  label,
+  value,
+  onChangeText,
+  visible: passwordVisible,
+  onToggleVisible,
+  focused,
+  onFocus,
+  onBlur,
+}: SecurePasswordFieldProps) {
+  return (
+    <>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={[styles.secureInputRow, focused && styles.secureInputRowFocused]}>
+        <TextInput
+          style={styles.secureInput}
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={!passwordVisible}
+          placeholderTextColor={d.textMuted}
+          placeholder="••••••••"
+          onFocus={onFocus}
+          onBlur={onBlur}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <Pressable
+          onPress={onToggleVisible}
+          style={styles.secureInputEye}
+          accessibilityRole="button"
+          accessibilityLabel={passwordVisible ? 'Ocultar senha' : 'Mostrar senha'}
+          hitSlop={8}
+        >
+          <Ionicons
+            name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
+            size={22}
+            color={d.profileSecondary}
+          />
+        </Pressable>
+      </View>
+    </>
+  );
+}
+
 function EditPasswordModal({ visible, onClose }: EditPasswordModalProps) {
+  const insets = useSafeAreaInsets();
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [focusedField, setFocusedField] = useState<'current' | 'new' | 'confirm' | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const updatePassword = useUpdatePassword();
 
   const handleSave = useCallback(() => {
-    if (!password || !newPassword) {
-      Alert.alert('Atenção', 'Preencha os dois campos.');
+    setFormError(null);
+    if (!password.trim()) {
+      setFormError('Informe a senha atual.');
+      return;
+    }
+    if (newPassword.length < MIN_NEW_PASSWORD_LENGTH) {
+      setFormError(`A nova senha deve ter pelo menos ${MIN_NEW_PASSWORD_LENGTH} caracteres.`);
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setFormError('A confirmação não coincide com a nova senha.');
       return;
     }
     updatePassword.mutate(
       { password, newPassword },
       {
         onSuccess: () => {
-          setPassword('');
-          setNewPassword('');
           onClose();
+          Alert.alert('Sucesso', 'Senha alterada.');
         },
         onError: () => Alert.alert('Erro', 'Não foi possível alterar a senha.'),
       },
     );
-  }, [password, newPassword, updatePassword, onClose]);
+  }, [password, newPassword, confirmNewPassword, updatePassword, onClose]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalSheet}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>Alterar Senha</Text>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      presentationStyle="overFullScreen"
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+      >
+        <ScrollView
+          style={styles.modalScroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.modalScrollContent}
+        >
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + spacing.md }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Alterar senha</Text>
 
-          <Text style={styles.fieldLabel}>Senha atual</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholderTextColor={d.textMuted}
-            placeholder="••••••••"
-          />
+            {formError ? <Text style={styles.formErrorText}>{formError}</Text> : null}
 
-          <Text style={styles.fieldLabel}>Nova senha</Text>
-          <TextInput
-            style={styles.input}
-            value={newPassword}
-            onChangeText={setNewPassword}
-            secureTextEntry
-            placeholderTextColor={d.textMuted}
-            placeholder="••••••••"
-          />
+            <SecurePasswordField
+              label="Senha atual"
+              value={password}
+              onChangeText={(t) => {
+                setPassword(t);
+                setFormError(null);
+              }}
+              visible={showCurrent}
+              onToggleVisible={() => setShowCurrent((s) => !s)}
+              focused={focusedField === 'current'}
+              onFocus={() => setFocusedField('current')}
+              onBlur={() => setFocusedField(null)}
+            />
 
-          <Pressable
-            style={[styles.saveButton, updatePassword.isPending && styles.buttonDisabled]}
-            onPress={handleSave}
-            disabled={updatePassword.isPending}
-          >
-            {updatePassword.isPending ? (
-              <ActivityIndicator color={d.text} size="small" />
-            ) : (
-              <Text style={styles.saveButtonText}>Salvar</Text>
-            )}
-          </Pressable>
-          <Pressable style={styles.cancelButton} onPress={onClose}>
-            <Text style={styles.cancelButtonText}>Cancelar</Text>
-          </Pressable>
-        </View>
-      </View>
+            <SecurePasswordField
+              label="Nova senha"
+              value={newPassword}
+              onChangeText={(t) => {
+                setNewPassword(t);
+                setFormError(null);
+              }}
+              visible={showNew}
+              onToggleVisible={() => setShowNew((s) => !s)}
+              focused={focusedField === 'new'}
+              onFocus={() => setFocusedField('new')}
+              onBlur={() => setFocusedField(null)}
+            />
+
+            <SecurePasswordField
+              label="Confirmar nova senha"
+              value={confirmNewPassword}
+              onChangeText={(t) => {
+                setConfirmNewPassword(t);
+                setFormError(null);
+              }}
+              visible={showConfirm}
+              onToggleVisible={() => setShowConfirm((s) => !s)}
+              focused={focusedField === 'confirm'}
+              onBlur={() => setFocusedField(null)}
+              onFocus={() => setFocusedField('confirm')}
+            />
+
+            <Pressable
+              style={[styles.saveButton, updatePassword.isPending && styles.buttonDisabled]}
+              onPress={handleSave}
+              disabled={updatePassword.isPending}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: updatePassword.isPending }}
+            >
+              {updatePassword.isPending ? (
+                <ActivityIndicator color={d.text} size="small" />
+              ) : (
+                <Text style={styles.saveButtonText}>Salvar</Text>
+              )}
+            </Pressable>
+            <Pressable
+              style={styles.cancelButton}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar alteração de senha"
+            >
+              <Text style={styles.cancelButtonText}>Cancelar</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 export function ProfileScreen() {
   const navigation = useNavigation<HomeTabNavigation>();
+  const { width } = useWindowDimensions();
+  const tileSize = useMemo(() => (width - GRID_GUTTER) / GRID_COLS, [width]);
   const signOut = useAuthStore((s) => s.signOut);
 
   const [editProfileVisible, setEditProfileVisible] = useState(false);
   const [editPasswordVisible, setEditPasswordVisible] = useState(false);
+  const [editProfileKey, setEditProfileKey] = useState(0);
+  const [editPasswordKey, setEditPasswordKey] = useState(0);
 
   const profileQuery = useMyProfile();
   const profile = profileQuery.data;
@@ -245,10 +438,7 @@ export function ProfileScreen() {
   );
 
   const handleLogout = useCallback(() => {
-    Alert.alert('Sair', 'Tem certeza que deseja sair?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: signOut },
-    ]);
+    confirmSignOut(signOut);
   }, [signOut]);
 
   const onEndReached = useCallback(() => {
@@ -258,15 +448,23 @@ export function ProfileScreen() {
   }, [postsQuery]);
 
   const renderGridItem = useCallback(
-    ({ item }: { item: PostWithAuthor }) => (
+    ({ item, index }: { item: PostWithAuthor; index: number }) => (
       <Pressable
-        style={styles.gridItem}
+        style={{
+          width: tileSize,
+          height: tileSize,
+          marginBottom: GRID_GUTTER,
+          marginRight: index % GRID_COLS !== GRID_COLS - 1 ? GRID_GUTTER : 0,
+        }}
         onPress={() => navigation.navigate('PostDetail', { postId: item.id })}
       >
         {item.image ? (
-          <RemoteImage uri={item.image} style={styles.gridImage} />
+          <RemoteImage
+            uri={`${env.imageUrl}/${item.image}`}
+            style={{ width: tileSize, height: tileSize }}
+          />
         ) : (
-          <View style={[styles.gridImage, styles.gridImageFallback]}>
+          <View style={[{ width: tileSize, height: tileSize }, styles.gridImageFallback]}>
             <Text style={styles.gridImageFallbackText} numberOfLines={3}>
               {item.content ?? ''}
             </Text>
@@ -274,7 +472,7 @@ export function ProfileScreen() {
         )}
       </Pressable>
     ),
-    [navigation],
+    [navigation, tileSize],
   );
 
   const keyExtractor = useCallback((item: PostWithAuthor) => String(item.id), []);
@@ -288,23 +486,56 @@ export function ProfileScreen() {
     return (
       <View style={styles.headerContainer}>
         <View style={styles.headerTop}>
-          {profile.avatar ? (
-            <RemoteImage uri={profile.avatar} style={styles.avatar} />
-          ) : (
-            <AvatarPlaceholder name={profile.fullName} size={80} />
-          )}
+          <Pressable
+            style={styles.avatarTap}
+            onPress={() =>
+              Alert.alert('Em breve', 'Alterar foto do perfil estará disponível em breve.')
+            }
+            accessibilityRole="button"
+            accessibilityLabel="Alterar foto do perfil"
+          >
+            {profile.avatar ? (
+              <RemoteImage uri={profile.avatar} style={styles.avatar} />
+            ) : (
+              <AvatarPlaceholder name={profile.fullName} size={80} />
+            )}
+            <View style={styles.avatarCameraBadge} pointerEvents="none">
+              <Ionicons name="camera" size={14} color={d.text} />
+            </View>
+          </Pressable>
           <View style={styles.counters}>
             <View style={styles.counterItem}>
               <Text style={styles.counterValue}>{profile.posts}</Text>
-              <Text style={styles.counterLabel}>Posts</Text>
+              <Text
+                style={styles.counterLabel}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.78}
+              >
+                Publicações
+              </Text>
             </View>
             <View style={styles.counterItem}>
               <Text style={styles.counterValue}>{profile.followers}</Text>
-              <Text style={styles.counterLabel}>Seguidores</Text>
+              <Text
+                style={styles.counterLabel}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.78}
+              >
+                Seguidores
+              </Text>
             </View>
             <View style={styles.counterItem}>
               <Text style={styles.counterValue}>{profile.following}</Text>
-              <Text style={styles.counterLabel}>Seguindo</Text>
+              <Text
+                style={styles.counterLabel}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.78}
+              >
+                Seguindo
+              </Text>
             </View>
           </View>
         </View>
@@ -314,16 +545,43 @@ export function ProfileScreen() {
         {!!profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
 
         <View style={styles.actionRow}>
-          <Pressable style={styles.actionButton} onPress={() => setEditProfileVisible(true)}>
-            <Text style={styles.actionButtonText}>Editar Perfil</Text>
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => {
+              setEditProfileKey((k) => k + 1);
+              setEditProfileVisible(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Editar perfil"
+          >
+            <View style={styles.actionButtonInner}>
+              <Ionicons name="create-outline" size={18} color={colors.primary} />
+              <Text style={styles.actionButtonText}>Editar perfil</Text>
+            </View>
           </Pressable>
-          <Pressable style={styles.actionButton} onPress={() => setEditPasswordVisible(true)}>
-            <Text style={styles.actionButtonText}>Alterar Senha</Text>
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => {
+              setEditPasswordKey((k) => k + 1);
+              setEditPasswordVisible(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Alterar senha"
+          >
+            <View style={styles.actionButtonInner}>
+              <Ionicons name="key-outline" size={18} color={colors.primary} />
+              <Text style={styles.actionButtonText}>Alterar senha</Text>
+            </View>
           </Pressable>
         </View>
 
-        <Pressable style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Sair</Text>
+        <Pressable
+          style={styles.logoutLink}
+          onPress={handleLogout}
+          accessibilityRole="button"
+          accessibilityLabel="Sair da conta"
+        >
+          <Text style={styles.logoutLinkText}>Sair</Text>
         </Pressable>
 
         <View style={styles.gridDivider} />
@@ -352,6 +610,7 @@ export function ProfileScreen() {
       {profile && (
         <>
           <EditProfileModal
+            key={`edit-profile-${editProfileKey}`}
             visible={editProfileVisible}
             onClose={() => setEditProfileVisible(false)}
             initialValues={{
@@ -361,6 +620,7 @@ export function ProfileScreen() {
             }}
           />
           <EditPasswordModal
+            key={`edit-password-${editPasswordKey}`}
             visible={editPasswordVisible}
             onClose={() => setEditPasswordVisible(false)}
           />
@@ -385,17 +645,37 @@ const styles = StyleSheet.create({
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.lg,
+    gap: spacing.md,
+  },
+  avatarTap: {
+    position: 'relative',
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
+    borderWidth: 2,
+    borderColor: `${colors.primary}55`,
+  },
+  avatarCameraBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: d.background,
   },
   avatarPlaceholder: {
     backgroundColor: d.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: `${colors.primary}55`,
   },
   avatarInitials: {
     color: d.text,
@@ -404,10 +684,15 @@ const styles = StyleSheet.create({
   counters: {
     flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    minWidth: 0,
   },
   counterItem: {
     alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
   },
   counterValue: {
     ...typography.subtitle,
@@ -416,8 +701,10 @@ const styles = StyleSheet.create({
   },
   counterLabel: {
     ...typography.caption,
-    color: d.textMuted,
+    color: d.profileSecondary,
     marginTop: 2,
+    textAlign: 'center',
+    alignSelf: 'stretch',
   },
   fullName: {
     ...typography.subtitle,
@@ -426,7 +713,7 @@ const styles = StyleSheet.create({
   },
   username: {
     ...typography.caption,
-    color: d.textMuted,
+    color: d.profileSecondary,
     marginTop: 2,
   },
   bio: {
@@ -446,21 +733,28 @@ const styles = StyleSheet.create({
     borderRadius: radii.button,
     backgroundColor: d.surface,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  actionButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   actionButtonText: {
     ...typography.caption,
     color: d.text,
     fontWeight: '600',
   },
-  logoutButton: {
-    marginTop: spacing.sm,
+  logoutLink: {
+    alignSelf: 'center',
+    marginTop: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: radii.button,
-    borderWidth: 1,
-    borderColor: d.border,
-    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    minHeight: 44,
+    justifyContent: 'center',
   },
-  logoutButtonText: {
+  logoutLinkText: {
     ...typography.caption,
     color: colors.dark.likeActive,
     fontWeight: '600',
@@ -469,14 +763,6 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: d.border,
     marginTop: spacing.md,
-  },
-  gridItem: {
-    width: TILE_SIZE,
-    height: TILE_SIZE,
-  },
-  gridImage: {
-    width: TILE_SIZE,
-    height: TILE_SIZE,
   },
   gridImageFallback: {
     backgroundColor: d.surface,
@@ -516,12 +802,19 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     backgroundColor: d.overlay,
   },
+  modalScroll: {
+    flex: 1,
+    maxHeight: '100%',
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+  },
   modalSheet: {
     backgroundColor: d.surface,
     borderTopLeftRadius: radii.sheetTop,
     borderTopRightRadius: radii.sheetTop,
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xl,
     paddingTop: spacing.sm,
   },
   sheetHandle: {
@@ -543,8 +836,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     marginTop: spacing.sm,
   },
-  input: {
-    backgroundColor: d.background,
+  formErrorText: {
+    ...typography.caption,
+    color: colors.error,
+    marginBottom: spacing.sm,
+  },
+  sheetTextInput: {
+    backgroundColor: d.sheetInputFill,
     borderRadius: radii.input,
     borderWidth: 1,
     borderColor: d.border,
@@ -552,6 +850,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     ...typography.body,
+  },
+  sheetTextInputFocused: {
+    borderColor: colors.primary,
+  },
+  secureInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: d.sheetInputFill,
+    borderRadius: radii.input,
+    borderWidth: 1,
+    borderColor: d.border,
+    minHeight: 48,
+    paddingLeft: spacing.md,
+  },
+  secureInputRowFocused: {
+    borderColor: colors.primary,
+  },
+  secureInput: {
+    flex: 1,
+    color: d.text,
+    paddingVertical: spacing.sm,
+    paddingRight: spacing.xs,
+    ...typography.body,
+  },
+  secureInputEye: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   inputMultiline: {
     height: 80,
@@ -563,6 +890,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.button,
     paddingVertical: spacing.sm + 2,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
   },
   saveButtonText: {
     ...typography.subtitle,

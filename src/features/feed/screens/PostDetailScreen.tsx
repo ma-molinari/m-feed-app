@@ -1,22 +1,29 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { DimensionValue } from 'react-native';
 import {
   ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
+  LayoutChangeEvent,
   Platform,
   Pressable,
+  RefreshControl,
   Share,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { MainStackParamList } from '@navigation/types';
+import { useScreenTopInset } from '@navigation/screenTopInset';
 import { colors } from '@theme/colors';
 import { spacing } from '@theme/spacing';
 import { typography } from '@theme/typography';
@@ -24,29 +31,61 @@ import { RemoteImage } from '@shared/components/RemoteImage';
 
 import { useComments } from '../hooks/useComments';
 import { useCreateComment } from '../hooks/useCreateComment';
+import { useFeedMutations } from '../hooks/useFeedMutations';
+import { useLikedPosts } from '../hooks/useLikedPosts';
 import { usePostDetail } from '../hooks/usePostDetail';
 import type { CommentWithUser } from '../types';
+import { formatRelativeTime } from '../utils/formatRelativeTime';
+import { env } from '@/constants/env';
 
 const d = colors.dark;
 
-function formatRelativeTime(dateString: string): string {
-  const now = Date.now();
-  const then = new Date(dateString).getTime();
-  const diffMs = now - then;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'agora';
-  if (diffMin < 60) return `${diffMin}m`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h`;
-  const diffDays = Math.floor(diffHr / 24);
-  if (diffDays < 7) return `${diffDays}d`;
-  return new Date(dateString).toLocaleDateString();
+/** Altura da mídia: largura / proporção, limitada (evita número mágico solto no layout). */
+const POST_DETAIL_MEDIA_ASPECT = 4 / 3;
+const POST_DETAIL_MEDIA_MAX_HEIGHT = 360;
+const POST_DETAIL_MEDIA_MIN_HEIGHT = 200;
+
+/** Barra interna (título + ações) abaixo do padding global do shell — usada no offset do teclado (iOS). */
+const POST_DETAIL_HEADER_BAR_HEIGHT = 52;
+
+const HIT_SLOP = 12;
+
+function usePostDetailMediaHeight(): number {
+  const { width } = useWindowDimensions();
+  const byAspect = width / POST_DETAIL_MEDIA_ASPECT;
+  return Math.round(
+    Math.min(POST_DETAIL_MEDIA_MAX_HEIGHT, Math.max(POST_DETAIL_MEDIA_MIN_HEIGHT, byAspect)),
+  );
 }
 
-function SkeletonBlock({ width, height, borderRadius = 4 }: { width: number | string; height: number; borderRadius?: number }) {
-  const shimmer = useRef(new Animated.Value(0)).current;
+function formatAbsolutePostDate(dateString: string): string {
+  return new Date(dateString).toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
-  useMemo(() => {
+function isPostOlderThanSevenDays(dateString: string): boolean {
+  const diffMs = Date.now() - new Date(dateString).getTime();
+  const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  return diffDays >= 7;
+}
+
+function SkeletonBlock({
+  width,
+  height,
+  borderRadius = 4,
+}: {
+  width: DimensionValue;
+  height: number;
+  borderRadius?: number;
+}) {
+  const shimmer = useMemo(() => new Animated.Value(0), []);
+
+  useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(shimmer, { toValue: 1, duration: 800, useNativeDriver: false }),
@@ -54,7 +93,9 @@ function SkeletonBlock({ width, height, borderRadius = 4 }: { width: number | st
       ]),
     );
     loop.start();
-    return () => loop.stop();
+    return () => {
+      loop.stop();
+    };
   }, [shimmer]);
 
   const backgroundColor = shimmer.interpolate({
@@ -65,10 +106,10 @@ function SkeletonBlock({ width, height, borderRadius = 4 }: { width: number | st
   return <Animated.View style={[{ width, height, borderRadius }, { backgroundColor }]} />;
 }
 
-function PostDetailSkeleton() {
+function PostDetailSkeleton({ imageHeight }: { imageHeight: number }) {
   return (
     <View style={styles.skeletonContainer}>
-      <SkeletonBlock width="100%" height={300} borderRadius={0} />
+      <SkeletonBlock width="100%" height={imageHeight} borderRadius={0} />
       <View style={styles.skeletonContent}>
         <View style={styles.skeletonAuthorRow}>
           <SkeletonBlock width={36} height={36} borderRadius={18} />
@@ -89,9 +130,7 @@ function PostDetailSkeleton() {
 }
 
 function CommentItem({ comment }: { comment: CommentWithUser }) {
-  const avatarUri = comment.user.avatar
-    ? `${comment.user.avatar}`
-    : null;
+  const avatarUri = comment.user.avatar ? `${comment.user.avatar}` : null;
 
   return (
     <View style={styles.commentItem}>
@@ -121,12 +160,19 @@ export function PostDetailScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList, 'PostDetail'>>();
   const route = useRoute<RouteProp<MainStackParamList, 'PostDetail'>>();
   const { postId } = route.params;
+  const insets = useSafeAreaInsets();
+  const shellTopInset = useScreenTopInset();
+  const mediaHeight = usePostDetailMediaHeight();
 
   const [commentText, setCommentText] = useState('');
+  const [inputBarHeight, setInputBarHeight] = useState(72);
+  const commentInputRef = useRef<TextInput>(null);
 
   const postQuery = usePostDetail(postId);
   const commentsQuery = useComments(postId);
   const createComment = useCreateComment(postId);
+  const liked = useLikedPosts();
+  const { likePost, unlikePost } = useFeedMutations();
 
   const flatComments = useMemo(
     () => commentsQuery.data?.pages.flatMap((p) => p.data ?? []) ?? [],
@@ -139,6 +185,12 @@ export function PostDetailScreen() {
     }
   }, [commentsQuery]);
 
+  const onRefresh = useCallback(() => {
+    void Promise.all([postQuery.refetch(), commentsQuery.refetch()]);
+  }, [postQuery, commentsQuery]);
+
+  const listRefreshing = postQuery.isRefetching || commentsQuery.isRefetching;
+
   const handleSubmitComment = useCallback(() => {
     const trimmed = commentText.trim();
     if (!trimmed || createComment.isPending) return;
@@ -150,12 +202,20 @@ export function PostDetailScreen() {
   const handleShare = useCallback(async () => {
     const post = postQuery.data;
     if (!post) return;
-    const baseUrl = post.image.startsWith('http') ? post.image : `${post.image}`;
+    const baseUrl = post.image.startsWith('http') ? post.image : `${env.imageUrl}/${post.image}`;
     await Share.share({
       message: post.content ?? '',
       url: baseUrl,
     });
   }, [postQuery.data]);
+
+  const focusCommentInput = useCallback(() => {
+    commentInputRef.current?.focus();
+  }, []);
+
+  const onInputBarLayout = useCallback((e: LayoutChangeEvent) => {
+    setInputBarHeight(e.nativeEvent.layout.height);
+  }, []);
 
   const renderComment = useCallback(
     ({ item }: { item: CommentWithUser }) => <CommentItem comment={item} />,
@@ -165,19 +225,31 @@ export function PostDetailScreen() {
   const keyExtractor = useCallback((item: CommentWithUser) => String(item.id), []);
 
   const post = postQuery.data;
+  const isLiked = post ? liked.likedIdSet.has(post.id) : false;
+
+  const keyboardVerticalOffset =
+    Platform.OS === 'ios' ? shellTopInset + POST_DETAIL_HEADER_BAR_HEIGHT : 0;
 
   const ListHeader = useMemo(() => {
     if (postQuery.isPending) {
-      return <PostDetailSkeleton />;
+      return <PostDetailSkeleton imageHeight={mediaHeight} />;
     }
 
     if (!post) return null;
 
     const avatarUri = post.user.avatar ?? null;
+    const likes = post.total_likes ?? 0;
+    const commentsCount = post.total_comments ?? 0;
+    const relativeTime = formatRelativeTime(post.createdAt);
+    const showAbsoluteDate = isPostOlderThanSevenDays(post.createdAt);
 
     return (
       <View>
-        <RemoteImage uri={post.image} style={styles.postImage} contentFit="cover" />
+        <RemoteImage
+          uri={`${env.imageUrl}/${post.image}`}
+          style={[styles.postImage, { height: mediaHeight }]}
+          contentFit="cover"
+        />
         <View style={styles.postContent}>
           <View style={styles.authorRow}>
             <View style={styles.authorAvatar}>
@@ -193,41 +265,152 @@ export function PostDetailScreen() {
             </View>
             <View>
               <Text style={styles.authorName}>{post.user.username}</Text>
-              <Text style={styles.postTime}>{formatRelativeTime(post.createdAt)}</Text>
+              <Text style={styles.postTime}>
+                {showAbsoluteDate ? formatAbsolutePostDate(post.createdAt) : relativeTime}
+              </Text>
             </View>
           </View>
 
           {post.content ? <Text style={styles.postText}>{post.content}</Text> : null}
 
-          <View style={styles.statsRow}>
-            <Text style={styles.statText}>
-              {post.total_likes ?? 0} curtidas
-            </Text>
-            <Text style={styles.statSep}>·</Text>
-            <Text style={styles.statText}>
-              {post.total_comments ?? 0} comentários
-            </Text>
+          <View style={styles.engagementRow}>
+            <Pressable
+              onPress={() => (isLiked ? unlikePost(post.id) : likePost(post.id))}
+              style={styles.statBtn}
+              accessibilityRole="button"
+              accessibilityLabel={isLiked ? 'Descurtir' : 'Curtir'}
+              accessibilityHint={likes === 1 ? '1 curtida' : `${likes} curtidas`}
+            >
+              <Ionicons
+                name={isLiked ? 'heart' : 'heart-outline'}
+                size={22}
+                color={isLiked ? d.likeActive : d.text}
+              />
+              <Text style={styles.statLabel}>{likes}</Text>
+            </Pressable>
+            <Pressable
+              onPress={focusCommentInput}
+              style={styles.statBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Comentários"
+              accessibilityHint={
+                commentsCount === 1 ? '1 comentário' : `${commentsCount} comentários`
+              }
+            >
+              <Ionicons name="chatbubble-outline" size={20} color={d.text} />
+              <Text style={styles.statLabel}>{commentsCount}</Text>
+            </Pressable>
           </View>
         </View>
         <View style={styles.sectionDivider} />
         <Text style={styles.sectionLabel}>Comentários</Text>
+        {commentsQuery.isError ? (
+          <View style={styles.commentsErrorBanner}>
+            <Text style={styles.commentsErrorText}>Não foi possível carregar os comentários.</Text>
+            <Pressable
+              onPress={() => {
+                void commentsQuery.refetch();
+              }}
+              style={styles.commentsRetryBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Tentar carregar comentários novamente"
+            >
+              <Text style={styles.commentsRetryText}>Tentar novamente</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     );
-  }, [post, postQuery.isPending]);
+  }, [
+    post,
+    postQuery.isPending,
+    mediaHeight,
+    isLiked,
+    likePost,
+    unlikePost,
+    focusCommentInput,
+    commentsQuery,
+  ]);
+
+  const renderListEmpty = useCallback(() => {
+    if (commentsQuery.isPending) {
+      return (
+        <View style={styles.commentsLoading}>
+          <ActivityIndicator color={d.textMuted} />
+        </View>
+      );
+    }
+    if (commentsQuery.isError) {
+      return null;
+    }
+    return (
+      <Text style={styles.emptyCommentsText}>Nenhum comentário ainda. Seja o primeiro!</Text>
+    );
+  }, [commentsQuery.isPending, commentsQuery.isError]);
+
+  const listFooterSpinner =
+    commentsQuery.isFetchingNextPage ? (
+      <ActivityIndicator color={d.textMuted} style={styles.footerSpinner} />
+    ) : null;
+
+  if (postQuery.isError) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={styles.headerIconButton}
+            hitSlop={HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar"
+          >
+            <Ionicons name="chevron-back" size={28} color={d.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Post</Text>
+          <View style={styles.headerIconButton} />
+        </View>
+        <View style={styles.errorState}>
+          <Text style={styles.errorStateText}>Não foi possível carregar o post.</Text>
+          <Pressable
+            onPress={() => {
+              void postQuery.refetch();
+            }}
+            style={styles.errorRetryBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Tentar carregar o post novamente"
+          >
+            <Text style={styles.errorRetryText}>Tentar novamente</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={0}
+      keyboardVerticalOffset={keyboardVerticalOffset}
     >
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton} hitSlop={12}>
-          <Text style={styles.backIcon}>{'‹'}</Text>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.headerIconButton}
+          hitSlop={HIT_SLOP}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+        >
+          <Ionicons name="chevron-back" size={28} color={d.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Post</Text>
-        <Pressable onPress={handleShare} style={styles.shareButton} hitSlop={12}>
-          <Text style={styles.shareText}>Compartilhar</Text>
+        <Pressable
+          onPress={handleShare}
+          style={styles.headerIconButton}
+          hitSlop={HIT_SLOP}
+          accessibilityRole="button"
+          accessibilityLabel="Compartilhar"
+        >
+          <Ionicons name="share-outline" size={24} color={colors.primary} />
         </Pressable>
       </View>
 
@@ -235,19 +418,29 @@ export function PostDetailScreen() {
         data={flatComments}
         renderItem={renderComment}
         keyExtractor={keyExtractor}
+        drawDistance={320}
         ListHeaderComponent={ListHeader}
+        ListEmptyComponent={renderListEmpty}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
-        estimatedItemSize={80}
-        ListFooterComponent={
-          commentsQuery.isFetchingNextPage ? (
-            <ActivityIndicator color={d.textMuted} style={styles.footerSpinner} />
-          ) : null
+        contentContainerStyle={{ paddingBottom: inputBarHeight }}
+        refreshControl={
+          <RefreshControl
+            refreshing={listRefreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
         }
+        ListFooterComponent={listFooterSpinner}
       />
 
-      <View style={styles.inputBar}>
+      <View
+        style={[styles.inputBar, { paddingBottom: spacing.sm + insets.bottom }]}
+        onLayout={onInputBarLayout}
+      >
         <TextInput
+          ref={commentInputRef}
           style={styles.textInput}
           placeholder="Adicione um comentário..."
           placeholderTextColor={d.textMuted}
@@ -258,7 +451,10 @@ export function PostDetailScreen() {
         />
         <Pressable
           onPress={handleSubmitComment}
-          style={[styles.sendButton, (!commentText.trim() || createComment.isPending) && styles.sendButtonDisabled]}
+          style={[
+            styles.sendButton,
+            (!commentText.trim() || createComment.isPending) && styles.sendButtonDisabled,
+          ]}
           disabled={!commentText.trim() || createComment.isPending}
         >
           {createComment.isPending ? (
@@ -282,39 +478,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.xl + spacing.md,
     paddingBottom: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: d.border,
+    minHeight: POST_DETAIL_HEADER_BAR_HEIGHT,
   },
-  backButton: {
-    width: 40,
-  },
-  backIcon: {
-    fontSize: 32,
-    color: d.text,
-    lineHeight: 36,
+  headerIconButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     ...typography.subtitle,
     color: d.text,
   },
-  shareButton: {
-    width: 100,
-    alignItems: 'flex-end',
-  },
-  shareText: {
-    ...typography.caption,
-    color: colors.primary,
-    fontWeight: '600',
-  },
   postImage: {
     width: '100%',
-    height: 300,
+    backgroundColor: d.surface,
   },
   postContent: {
     padding: spacing.md,
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   authorRow: {
     flexDirection: 'row',
@@ -353,24 +538,31 @@ const styles = StyleSheet.create({
     color: d.text,
     lineHeight: 22,
   },
-  statsRow: {
+  engagementRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
+  statBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    marginTop: spacing.xs,
+    minHeight: 44,
+    minWidth: 44,
+    paddingHorizontal: spacing.sm,
+    justifyContent: 'center',
   },
-  statText: {
+  statLabel: {
     ...typography.caption,
-    color: d.textMuted,
-  },
-  statSep: {
-    ...typography.caption,
-    color: d.textMuted,
+    color: d.text,
+    fontWeight: '600',
   },
   sectionDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: d.border,
     marginHorizontal: spacing.md,
+    marginTop: spacing.md,
   },
   sectionLabel: {
     ...typography.caption,
@@ -379,7 +571,66 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  commentsErrorBanner: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    backgroundColor: d.surface,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: d.border,
+    gap: spacing.sm,
+  },
+  commentsErrorText: {
+    ...typography.body,
+    color: d.textMuted,
+  },
+  commentsRetryBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.xs,
+  },
+  commentsRetryText: {
+    ...typography.subtitle,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  commentsLoading: {
+    paddingVertical: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyCommentsText: {
+    ...typography.body,
+    color: d.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+  errorState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  },
+  errorStateText: {
+    ...typography.body,
+    color: d.textMuted,
+    textAlign: 'center',
+  },
+  errorRetryBtn: {
     paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: d.surface,
+    borderRadius: 12,
+  },
+  errorRetryText: {
+    ...typography.subtitle,
+    color: d.text,
+    fontWeight: '600',
   },
   commentItem: {
     flexDirection: 'row',
@@ -425,7 +676,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: d.border,
     backgroundColor: d.surface,

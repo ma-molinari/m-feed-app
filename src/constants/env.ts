@@ -40,6 +40,12 @@ if (typeof __DEV__ !== 'undefined' && __DEV__ && !apiUrl) {
   );
 }
 
+if (typeof __DEV__ !== 'undefined' && !__DEV__ && !apiUrl.trim()) {
+  throw new Error(
+    '[env] apiUrl is required in production builds. Set EXPO_PUBLIC_API_URL (see docs/INTEGRATIONS.md) or native API_URL via react-native-config.',
+  );
+}
+
 export const env = {
   apiUrl,
   imageUrl,

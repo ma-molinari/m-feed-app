@@ -3,6 +3,7 @@
  * Login usa `apiClient` com `skipGlobal401Handler` para não disparar `signOut` em 401.
  */
 import { apiClient } from '@services/api/client';
+import { InvalidLoginResponseError } from '@services/api/errors';
 
 import type { AuthUser } from '@features/auth/types';
 
@@ -22,7 +23,13 @@ export async function login(payload: LoginPayload): Promise<{ token: string; use
   const { data } = await apiClient.post<LoginApiEnvelope>('/public/login', payload, {
     skipGlobal401Handler: true,
   });
-  return data.data;
+  const inner = data?.data;
+  const token = inner?.token;
+  const user = inner?.user;
+  if (typeof token !== 'string' || !token.trim() || !user?.id) {
+    throw new InvalidLoginResponseError();
+  }
+  return { token, user };
 }
 
 export type RegisterPayload = {

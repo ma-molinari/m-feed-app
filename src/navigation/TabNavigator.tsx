@@ -5,17 +5,19 @@ import { CreateScreen } from '@features/create/screens/CreateScreen';
 import { FeedScreen } from '@features/feed/screens/FeedScreen';
 import { ProfileScreen } from '@features/profile/screens/ProfileScreen';
 import { SearchScreen } from '@features/search/screens/SearchScreen';
+import { colors } from '@theme/colors';
 
 export const MainTabNavigator = createBottomTabNavigator({
   initialRouteName: 'Home',
   screenOptions: {
     headerShown: false,
     tabBarShowLabel: false,
-    tabBarActiveTintColor: '#FFFFFF',
+    tabBarActiveTintColor: colors.dark.text,
     tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
     tabBarStyle: {
-      backgroundColor: '#000000',
-      borderTopColor: '#1C1C1E',
+      backgroundColor: colors.dark.surface,
+      borderTopColor: colors.dark.border,
+      paddingTop: 5,
     },
   },
   screens: {

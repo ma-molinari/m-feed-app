@@ -1,4 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo } from 'react';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { env } from '@constants/env';
 import { RemoteImage } from '@shared/components/RemoteImage';
@@ -7,6 +9,7 @@ import { spacing } from '@theme/spacing';
 import { typography } from '@theme/typography';
 
 import type { PostWithAuthor } from '../types';
+import { formatRelativeTime } from '../utils/formatRelativeTime';
 
 const d = colors.dark;
 
@@ -22,20 +25,6 @@ function resolvePostImageUri(raw: string): string {
   const base = (env.imageUrl ?? '').replace(/\/$/, '');
   if (!base) return resolveMediaUri(raw);
   return `${base}${raw.startsWith('/') ? '' : '/'}${raw}`;
-}
-
-function formatRelativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const sec = Math.floor((now - then) / 1000);
-  if (sec < 60) return 'agora';
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `${h}h`;
-  const days = Math.floor(h / 24);
-  if (days < 7) return `${days}d`;
-  return new Date(iso).toLocaleDateString();
 }
 
 function authorInitial(fullName: string): string {
@@ -62,6 +51,11 @@ export function PostCard({
   onOptionsPress,
   onAuthorPress,
 }: Props) {
+  const { width: windowWidth } = useWindowDimensions();
+  const postImageHeight = useMemo(
+    () => Math.min(240, Math.round(windowWidth * 0.58)),
+    [windowWidth],
+  );
   const { user } = post;
   const likes = post.total_likes ?? 0;
   const comments = post.total_comments ?? 0;
@@ -71,7 +65,13 @@ export function PostCard({
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Pressable onPress={onAuthorPress} style={styles.authorBlock} hitSlop={4}>
+        <Pressable
+          onPress={onAuthorPress}
+          style={styles.authorBlock}
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel={`${user.fullName}, @${user.username}`}
+        >
           {avatarUri ? (
             <RemoteImage uri={avatarUri} style={styles.avatar} />
           ) : (
@@ -88,20 +88,51 @@ export function PostCard({
             </Text>
           </View>
         </Pressable>
-        <Pressable onPress={onOptionsPress} hitSlop={12} style={styles.moreBtn}>
-          <Text style={styles.moreDots}>⋯</Text>
+        <Pressable
+          onPress={onOptionsPress}
+          style={styles.moreBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Opções da publicação"
+        >
+          <Ionicons name="ellipsis-horizontal" size={22} color={d.moreIcon} />
         </Pressable>
       </View>
 
-      <RemoteImage uri={imageUri} style={styles.postImage} contentFit="cover" />
+      {!!post.content?.trim() && (
+        <Text style={styles.caption} numberOfLines={6}>
+          {post.content.trim()}
+        </Text>
+      )}
+
+      <RemoteImage
+        uri={imageUri}
+        style={[styles.postImage, { height: postImageHeight }]}
+        contentFit="cover"
+      />
 
       <View style={styles.footer}>
-        <Pressable onPress={isLiked ? onUnlike : onLike} style={styles.stat} hitSlop={8}>
-          <Text style={[styles.heart, isLiked && styles.heartActive]}>{isLiked ? '❤' : '🤍'}</Text>
+        <Pressable
+          onPress={isLiked ? onUnlike : onLike}
+          style={styles.statBtn}
+          accessibilityRole="button"
+          accessibilityLabel={isLiked ? 'Descurtir' : 'Curtir'}
+          accessibilityHint={likes === 1 ? '1 curtida' : `${likes} curtidas`}
+        >
+          <Ionicons
+            name={isLiked ? 'heart' : 'heart-outline'}
+            size={22}
+            color={isLiked ? d.likeActive : d.text}
+          />
           <Text style={styles.statLabel}>{likes}</Text>
         </Pressable>
-        <Pressable onPress={onComment} style={styles.stat} hitSlop={8}>
-          <Text style={styles.commentIcon}>💬</Text>
+        <Pressable
+          onPress={onComment}
+          style={styles.statBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Comentários"
+          accessibilityHint={comments === 1 ? '1 comentário' : `${comments} comentários`}
+        >
+          <Ionicons name="chatbubble-outline" size={20} color={d.text} />
           <Text style={styles.statLabel}>{comments}</Text>
         </Pressable>
       </View>
@@ -114,6 +145,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     marginBottom: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: d.border,
   },
   header: {
     flexDirection: 'row',
@@ -136,13 +169,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: d.surface,
+    backgroundColor: d.avatarFallbackBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarLetter: {
     ...typography.subtitle,
-    color: d.text,
+    color: d.avatarFallbackText,
+    fontWeight: '600',
   },
   authorMeta: {
     flex: 1,
@@ -157,39 +191,37 @@ const styles = StyleSheet.create({
     color: d.textMuted,
     marginTop: 2,
   },
-  moreBtn: {
-    paddingHorizontal: spacing.xs,
-  },
-  moreDots: {
-    fontSize: 22,
-    color: d.text,
+  caption: {
+    ...typography.body,
     lineHeight: 24,
+    color: d.text,
+    marginBottom: spacing.sm,
+  },
+  moreBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   postImage: {
     width: '100%',
-    height: 220,
     borderRadius: 12,
     backgroundColor: d.surface,
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.lg,
+    gap: spacing.md,
     marginTop: spacing.sm,
   },
-  stat: {
+  statBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-  },
-  heart: {
-    fontSize: 20,
-  },
-  heartActive: {
-    color: d.likeActive,
-  },
-  commentIcon: {
-    fontSize: 18,
+    minHeight: 44,
+    minWidth: 44,
+    paddingHorizontal: spacing.sm,
+    justifyContent: 'center',
   },
   statLabel: {
     ...typography.caption,

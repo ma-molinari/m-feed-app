@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -31,7 +33,7 @@ const LOGIN_HERO = require('../../../../assets/images/login-hero.jpg');
 
 type RegisterNavigation = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
 
-const SHEET_HEIGHT_RATIO = 0.72;
+const SHEET_HEIGHT_RATIO = 0.62;
 
 type FieldErrors = {
   email?: string;
@@ -52,6 +54,11 @@ export function RegisterScreen() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [apiError, setApiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [usernameFocused, setUsernameFocused] = useState(false);
+  const [fullNameFocused, setFullNameFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   const sheetHeight = useMemo(() => Math.round(windowHeight * SHEET_HEIGHT_RATIO), [windowHeight]);
 
@@ -106,12 +113,14 @@ export function RegisterScreen() {
     const fullNameTrim = fullName.trim();
     const passwordTrim = password.trim();
     const nextField: FieldErrors = {};
-    if (!emailTrim) nextField.email = 'Informe o e-mail.';
-    if (!usernameTrim) nextField.username = 'Informe o nome de usuário.';
-    else if (usernameTrim.length < 3) nextField.username = 'O nome de usuário deve ter pelo menos 3 caracteres.';
-    if (!fullNameTrim) nextField.fullName = 'Informe o nome completo.';
-    if (!passwordTrim) nextField.password = 'Informe a senha.';
-    else if (passwordTrim.length < 6) nextField.password = 'A senha deve ter pelo menos 6 caracteres.';
+    if (!emailTrim) nextField.email = 'Enter your email.';
+    if (!usernameTrim) nextField.username = 'Enter a username.';
+    else if (usernameTrim.length < 3)
+      nextField.username = 'Username must be at least 3 characters.';
+    if (!fullNameTrim) nextField.fullName = 'Enter your full name.';
+    if (!passwordTrim) nextField.password = 'Enter your password.';
+    else if (passwordTrim.length < 6)
+      nextField.password = 'Password must be at least 6 characters.';
     if (Object.keys(nextField).length > 0) {
       setFieldErrors(nextField);
       setApiError(null);
@@ -129,10 +138,10 @@ export function RegisterScreen() {
         password: passwordTrim,
       });
       navigation.navigate('Login', {
-        successMessage: 'Conta criada! Faça login para continuar.',
+        successMessage: 'Account created. Sign in to continue.',
       });
     } catch (e) {
-      setApiError(getApiErrorMessage(e));
+      setApiError(getApiErrorMessage(e, 'login'));
     } finally {
       setLoading(false);
     }
@@ -147,6 +156,7 @@ export function RegisterScreen() {
         contentPosition="center"
         accessibilityIgnoresInvertColors
       />
+      <View style={styles.heroOverlay} pointerEvents="none" importantForAccessibility="no" />
 
       <View style={[styles.brandSafe, { paddingTop: insets.top + SCREEN_TOP_EXTRA_PADDING }]}>
         <Text style={styles.brandText} accessibilityRole="header">
@@ -169,10 +179,9 @@ export function RegisterScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={[
                 styles.scrollContent,
-                { paddingBottom: insets.bottom + spacing.lg },
+                { paddingBottom: insets.bottom + spacing.xl + spacing.lg },
               ]}
             >
-              <Text style={styles.eyebrow}>Sign up.</Text>
               <Text style={styles.welcome}>Create your M-Feed account</Text>
               <Text style={styles.subtitle}>Fill in the fields below to get started.</Text>
 
@@ -188,12 +197,15 @@ export function RegisterScreen() {
               <TextInput
                 style={[
                   styles.input,
+                  emailFocused && !fieldErrors.email ? styles.inputFocused : null,
                   fieldErrors.email ? styles.inputError : null,
                   { marginBottom: fieldErrors.email ? spacing.xs : spacing.md },
                 ]}
                 value={email}
                 onChangeText={onChangeEmail}
-                placeholder="E-mail"
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
+                placeholder="you@email.com"
                 placeholderTextColor={colors.loginPlaceholder}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -209,12 +221,15 @@ export function RegisterScreen() {
               <TextInput
                 style={[
                   styles.input,
+                  usernameFocused && !fieldErrors.username ? styles.inputFocused : null,
                   fieldErrors.username ? styles.inputError : null,
                   { marginBottom: fieldErrors.username ? spacing.xs : spacing.md },
                 ]}
                 value={username}
                 onChangeText={onChangeUsername}
-                placeholder="Username (min. 3 characters)"
+                onFocus={() => setUsernameFocused(true)}
+                onBlur={() => setUsernameFocused(false)}
+                placeholder="At least 3 characters"
                 placeholderTextColor={colors.loginPlaceholder}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -231,12 +246,15 @@ export function RegisterScreen() {
               <TextInput
                 style={[
                   styles.input,
+                  fullNameFocused && !fieldErrors.fullName ? styles.inputFocused : null,
                   fieldErrors.fullName ? styles.inputError : null,
                   { marginBottom: fieldErrors.fullName ? spacing.xs : spacing.md },
                 ]}
                 value={fullName}
                 onChangeText={onChangeFullName}
-                placeholder="Full name"
+                onFocus={() => setFullNameFocused(true)}
+                onBlur={() => setFullNameFocused(false)}
+                placeholder="Your full name"
                 placeholderTextColor={colors.loginPlaceholder}
                 accessibilityLabel="Full name"
                 editable={!loading}
@@ -248,20 +266,41 @@ export function RegisterScreen() {
               <Text style={styles.fieldLabel} accessibilityRole="text">
                 Password
               </Text>
-              <TextInput
+              <View
                 style={[
-                  styles.input,
-                  fieldErrors.password ? styles.inputError : null,
+                  styles.passwordRow,
+                  passwordFocused && !fieldErrors.password ? styles.inputRowFocused : null,
+                  fieldErrors.password ? styles.passwordRowError : null,
                   { marginBottom: fieldErrors.password ? spacing.xs : spacing.md },
                 ]}
-                value={password}
-                onChangeText={onChangePassword}
-                placeholder="Password (min. 6 characters)"
-                placeholderTextColor={colors.loginPlaceholder}
-                secureTextEntry
-                accessibilityLabel="Password"
-                editable={!loading}
-              />
+              >
+                <TextInput
+                  style={styles.passwordInput}
+                  value={password}
+                  onChangeText={onChangePassword}
+                  onFocus={() => setPasswordFocused(true)}
+                  onBlur={() => setPasswordFocused(false)}
+                  placeholder="At least 6 characters"
+                  placeholderTextColor={colors.loginPlaceholder}
+                  secureTextEntry={!passwordVisible}
+                  accessibilityLabel="Password"
+                  editable={!loading}
+                />
+                <Pressable
+                  onPress={() => setPasswordVisible((v) => !v)}
+                  style={styles.passwordToggle}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+                  disabled={loading}
+                >
+                  <Ionicons
+                    name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
+                    size={22}
+                    color={colors.textMuted}
+                  />
+                </Pressable>
+              </View>
               {fieldErrors.password ? (
                 <Text style={styles.inlineError}>{fieldErrors.password}</Text>
               ) : null}
@@ -278,11 +317,18 @@ export function RegisterScreen() {
                 accessibilityState={{ disabled: loading }}
                 disabled={loading}
               >
-                <Text style={styles.submitLabel}>{loading ? 'Criando conta…' : 'Create account'}</Text>
+                {loading ? (
+                  <View style={styles.submitInner}>
+                    <ActivityIndicator color={colors.background} />
+                    <Text style={styles.submitLabel}>Creating account…</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.submitLabel}>Create account</Text>
+                )}
               </Pressable>
 
               <View style={styles.footerRow}>
-                <Text style={styles.footerMuted}>Já tem conta? </Text>
+                <Text style={styles.footerMuted}>Already have an account? </Text>
                 <Pressable
                   onPress={() => navigation.navigate('Login')}
                   hitSlop={12}
@@ -304,6 +350,10 @@ export function RegisterScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.loginHeroOverlay,
   },
   brandSafe: {
     position: 'absolute',
@@ -356,11 +406,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingTop: spacing.xs,
   },
-  eyebrow: {
-    ...typography.loginEyebrow,
-    color: colors.loginText,
-    marginBottom: spacing.xs,
-  },
   welcome: {
     ...typography.loginWelcome,
     color: colors.loginText,
@@ -369,7 +414,7 @@ const styles = StyleSheet.create({
   subtitle: {
     ...typography.body,
     color: colors.textMuted,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   apiError: {
     ...typography.body,
@@ -389,9 +434,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     fontSize: 16,
     color: colors.loginText,
+    backgroundColor: colors.loginInputFill,
+  },
+  inputFocused: {
+    borderColor: colors.primary,
+    borderWidth: 1.5,
   },
   inputError: {
     borderColor: colors.error,
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.input,
+    backgroundColor: colors.loginInputFill,
+    paddingRight: spacing.xs,
+  },
+  passwordRowError: {
+    borderColor: colors.error,
+  },
+  inputRowFocused: {
+    borderColor: colors.primary,
+    borderWidth: 1.5,
+  },
+  passwordInput: {
+    flex: 1,
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+    fontSize: 16,
+    color: colors.loginText,
+  },
+  passwordToggle: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   inlineError: {
     ...typography.body,
@@ -413,6 +493,11 @@ const styles = StyleSheet.create({
   },
   submitDisabled: {
     opacity: 0.55,
+  },
+  submitInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   submitLabel: {
     color: colors.background,

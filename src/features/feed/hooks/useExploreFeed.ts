@@ -1,12 +1,13 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 
+import { feedKeys } from '../queryKeys';
 import { fetchExploreFeed } from '../services/feedApi';
 
 const EXPLORE_PAGE_SIZE = 10;
 
 export function useExploreFeed(enabled = true) {
   return useInfiniteQuery({
-    queryKey: ['feed', 'explore'],
+    queryKey: feedKeys.explore(),
     enabled,
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>

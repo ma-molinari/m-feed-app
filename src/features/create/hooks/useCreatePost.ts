@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { MainStackParamList } from '@navigation/types';
+import { feedKeys } from '@features/feed/queryKeys';
+
 import { createPost, uploadFile } from '../services/createApi';
 
 type CreatePostInput = { uri: string; content: string };
@@ -17,8 +19,8 @@ export function useCreatePost(
       await createPost({ image: filename, content });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['feed', 'foryou'] });
-      queryClient.invalidateQueries({ queryKey: ['feed', 'explore'] });
+      queryClient.invalidateQueries({ queryKey: feedKeys.forYou() });
+      queryClient.invalidateQueries({ queryKey: feedKeys.explore() });
       navigation.reset({ index: 0, routes: [{ name: 'Tabs' }] });
     },
   });

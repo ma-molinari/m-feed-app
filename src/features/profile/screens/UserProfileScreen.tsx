@@ -4,12 +4,12 @@ import {
   Dimensions,
   FlatList,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -24,6 +24,7 @@ import { useFollowUser } from '../hooks/useFollowUser';
 import { useUserById } from '../hooks/useUserById';
 import { useUserPosts } from '../hooks/useUserPosts';
 import type { PostWithAuthor } from '../types';
+import { env } from '@/constants/env';
 
 const { width } = Dimensions.get('window');
 const GRID_COLS = 3;
@@ -44,10 +45,26 @@ function AvatarPlaceholder({ name, size }: { name: string; size: number }) {
   );
 }
 
-function SkeletonBlock({ width: w, height: h, style }: { width: number | string; height: number; style?: object }) {
+function SkeletonBlock({
+  width: w,
+  height: h,
+  style,
+}: {
+  width: number | string;
+  height: number;
+  style?: object;
+}) {
   return (
     <View
-      style={[{ width: w as number, height: h, borderRadius: radii.input, backgroundColor: d.skeletonBase }, style]}
+      style={[
+        {
+          width: w as number,
+          height: h,
+          borderRadius: radii.input,
+          backgroundColor: d.skeletonBase,
+        },
+        style,
+      ]}
     />
   );
 }
@@ -66,7 +83,11 @@ function UserProfileSkeleton() {
       <SkeletonBlock width={140} height={16} style={{ marginTop: spacing.sm }} />
       <SkeletonBlock width={100} height={13} style={{ marginTop: spacing.xs }} />
       <SkeletonBlock width={200} height={13} style={{ marginTop: spacing.xs }} />
-      <SkeletonBlock width={'100%' as unknown as number} height={36} style={{ marginTop: spacing.md }} />
+      <SkeletonBlock
+        width={'100%' as unknown as number}
+        height={36}
+        style={{ marginTop: spacing.md }}
+      />
     </View>
   );
 }
@@ -119,7 +140,7 @@ export function UserProfileScreen() {
         onPress={() => navigation.navigate('PostDetail', { postId: item.id })}
       >
         {item.image ? (
-          <RemoteImage uri={item.image} style={styles.gridImage} />
+          <RemoteImage uri={`${env.imageUrl}/${item.image}`} style={styles.gridImage} />
         ) : (
           <View style={[styles.gridImage, styles.gridImageFallback]}>
             <Text style={styles.gridImageFallbackText} numberOfLines={3}>
@@ -170,7 +191,11 @@ export function UserProfileScreen() {
         {!!profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
 
         <Pressable
-          style={[styles.followButton, isFollowing && styles.followButtonActive, isMutating && styles.buttonDisabled]}
+          style={[
+            styles.followButton,
+            isFollowing && styles.followButtonActive,
+            isMutating && styles.buttonDisabled,
+          ]}
           onPress={handleFollowToggle}
           disabled={isMutating}
         >

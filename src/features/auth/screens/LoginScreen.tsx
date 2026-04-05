@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -34,7 +36,7 @@ const LOGIN_HERO = require('../../../../assets/images/login-hero.jpg');
 type LoginNavigation = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 type LoginRoute = RouteProp<AuthStackParamList, 'Login'>;
 
-const SHEET_HEIGHT_RATIO = 0.72;
+const SHEET_HEIGHT_RATIO = 0.62;
 
 type FieldErrors = {
   emailOrUsername?: string;
@@ -54,6 +56,9 @@ export function LoginScreen() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [apiError, setApiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   const sheetHeight = useMemo(() => Math.round(windowHeight * SHEET_HEIGHT_RATIO), [windowHeight]);
 
@@ -88,8 +93,8 @@ export function LoginScreen() {
     const emailTrim = emailOrUsername.trim();
     const passwordTrim = password.trim();
     const nextField: FieldErrors = {};
-    if (!emailTrim) nextField.emailOrUsername = 'Informe e-mail ou usuário.';
-    if (!passwordTrim) nextField.password = 'Informe a senha.';
+    if (!emailTrim) nextField.emailOrUsername = 'Enter your email or username.';
+    if (!passwordTrim) nextField.password = 'Enter your password.';
     if (Object.keys(nextField).length > 0) {
       setFieldErrors(nextField);
       setApiError(null);
@@ -103,7 +108,7 @@ export function LoginScreen() {
       const session = await login({ email: emailTrim, password: passwordTrim });
       setSession(session);
     } catch (e) {
-      setApiError(getApiErrorMessage(e));
+      setApiError(getApiErrorMessage(e, 'login'));
     } finally {
       setLoading(false);
     }
@@ -118,6 +123,7 @@ export function LoginScreen() {
         contentPosition="center"
         accessibilityIgnoresInvertColors
       />
+      <View style={styles.heroOverlay} pointerEvents="none" importantForAccessibility="no" />
 
       <View style={[styles.brandSafe, { paddingTop: insets.top + SCREEN_TOP_EXTRA_PADDING }]}>
         <Text style={styles.brandText} accessibilityRole="header">
@@ -140,10 +146,9 @@ export function LoginScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={[
                 styles.scrollContent,
-                { paddingBottom: insets.bottom + spacing.lg },
+                { paddingBottom: insets.bottom + spacing.xl + spacing.lg },
               ]}
             >
-              <Text style={styles.eyebrow}>Log in.</Text>
               <Text style={styles.welcome}>Welcome back to M-Feed</Text>
               <Text style={styles.subtitle}>Enter your credentials to access your account.</Text>
 
@@ -165,17 +170,21 @@ export function LoginScreen() {
               <TextInput
                 style={[
                   styles.input,
+                  emailFocused && !fieldErrors.emailOrUsername ? styles.inputFocused : null,
                   fieldErrors.emailOrUsername ? styles.inputError : null,
                   { marginBottom: fieldErrors.emailOrUsername ? spacing.xs : spacing.md },
                 ]}
                 value={emailOrUsername}
                 onChangeText={onChangeEmail}
-                placeholder="E-mail or Username"
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
+                placeholder="you@email.com or username"
                 placeholderTextColor={colors.loginPlaceholder}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
                 accessibilityLabel="E-mail or Username"
+                accessibilityHint="Use your email address or username"
                 editable={!loading}
               />
               {fieldErrors.emailOrUsername ? (
@@ -185,20 +194,41 @@ export function LoginScreen() {
               <Text style={styles.fieldLabel} accessibilityRole="text">
                 Password
               </Text>
-              <TextInput
+              <View
                 style={[
-                  styles.input,
-                  fieldErrors.password ? styles.inputError : null,
+                  styles.passwordRow,
+                  passwordFocused && !fieldErrors.password ? styles.inputRowFocused : null,
+                  fieldErrors.password ? styles.passwordRowError : null,
                   { marginBottom: fieldErrors.password ? spacing.xs : spacing.md },
                 ]}
-                value={password}
-                onChangeText={onChangePassword}
-                placeholder="Password"
-                placeholderTextColor={colors.loginPlaceholder}
-                secureTextEntry
-                accessibilityLabel="Password"
-                editable={!loading}
-              />
+              >
+                <TextInput
+                  style={styles.passwordInput}
+                  value={password}
+                  onChangeText={onChangePassword}
+                  onFocus={() => setPasswordFocused(true)}
+                  onBlur={() => setPasswordFocused(false)}
+                  placeholder="Your password"
+                  placeholderTextColor={colors.loginPlaceholder}
+                  secureTextEntry={!passwordVisible}
+                  accessibilityLabel="Password"
+                  editable={!loading}
+                />
+                <Pressable
+                  onPress={() => setPasswordVisible((v) => !v)}
+                  style={styles.passwordToggle}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+                  disabled={loading}
+                >
+                  <Ionicons
+                    name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
+                    size={22}
+                    color={colors.textMuted}
+                  />
+                </Pressable>
+              </View>
               {fieldErrors.password ? (
                 <Text style={styles.inlineError}>{fieldErrors.password}</Text>
               ) : null}
@@ -211,11 +241,18 @@ export function LoginScreen() {
                 ]}
                 onPress={onSubmit}
                 accessibilityRole="button"
-                accessibilityLabel="Submit"
+                accessibilityLabel="Sign in"
                 accessibilityState={{ disabled: loading }}
                 disabled={loading}
               >
-                <Text style={styles.submitLabel}>{loading ? 'Signing in…' : 'Submit'}</Text>
+                {loading ? (
+                  <View style={styles.submitInner}>
+                    <ActivityIndicator color={colors.background} />
+                    <Text style={styles.submitLabel}>Signing in…</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.submitLabel}>Sign in</Text>
+                )}
               </Pressable>
 
               <View style={styles.footerRow}>
@@ -241,6 +278,10 @@ export function LoginScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.loginHeroOverlay,
   },
   brandSafe: {
     position: 'absolute',
@@ -293,11 +334,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingTop: spacing.xs,
   },
-  eyebrow: {
-    ...typography.loginEyebrow,
-    color: colors.loginText,
-    marginBottom: spacing.xs,
-  },
   welcome: {
     ...typography.loginWelcome,
     color: colors.loginText,
@@ -306,7 +342,7 @@ const styles = StyleSheet.create({
   subtitle: {
     ...typography.body,
     color: colors.textMuted,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   successBanner: {
     ...typography.body,
@@ -331,9 +367,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     fontSize: 16,
     color: colors.loginText,
+    backgroundColor: colors.loginInputFill,
+  },
+  inputFocused: {
+    borderColor: colors.primary,
+    borderWidth: 1.5,
   },
   inputError: {
     borderColor: colors.error,
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.input,
+    backgroundColor: colors.loginInputFill,
+    paddingRight: spacing.xs,
+  },
+  passwordRowError: {
+    borderColor: colors.error,
+  },
+  inputRowFocused: {
+    borderColor: colors.primary,
+    borderWidth: 1.5,
+  },
+  passwordInput: {
+    flex: 1,
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+    fontSize: 16,
+    color: colors.loginText,
+  },
+  passwordToggle: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   inlineError: {
     ...typography.body,
@@ -355,6 +426,11 @@ const styles = StyleSheet.create({
   },
   submitDisabled: {
     opacity: 0.55,
+  },
+  submitInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   submitLabel: {
     color: colors.background,

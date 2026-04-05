@@ -1,0 +1,61 @@
+---
+description: >-
+  Contexto do projeto M-FEED e roteamento obrigatório para docs de engenharia
+  (.spec); aplicar em toda conversa para orientar leitura de arquivos e decisões
+  da LLM.
+alwaysApply: true
+---
+
+# M-FEED — contexto para agentes de IA
+
+App mobile **Expo / React Native** (feed + autenticação). Antes de implementar, **leia o código e as docs indicadas abaixo**; não assuma APIs ou fluxos que não estejam no repositório.
+
+## Regras gerais
+
+- Preferir padrões já usados em `src/` (features, aliases `@features`, `@services`, `@theme`, etc.).
+- Regras detalhadas de implementação UI/mobile: `.cursor/rules/engineering/` e `.cursor/rules/design/`.
+- Especificações de produto, layouts e endpoints de referência: pasta **`.spec/docs/`** (complementar às docs de engenharia em `docs/`).
+
+---
+
+## Docs de engenharia (`docs/`)
+
+Use esta tabela para decidir **o que carregar no contexto** da conversa ou da tarefa (via `@` ou leitura explícita).
+
+| Arquivo | Quando ler / incluir no contexto |
+|---------|----------------------------------|
+| **`docs/STACK.md`** | Perguntas sobre versões, dependências, ferramentas (Expo, Jest, ESLint), ou “com que stack isso roda?”. Antes de adicionar **nova dependência** ou mudar versão major. |
+| **`docs/ARCHITECTURE.md`** | Novas features que cruzam telas, navegação, estado global, React Query, ou fluxo auth ↔ API. Refatoração de `RootNavigator`, stores ou `apiClient`. |
+| **`docs/STRUCTURE.md`** | “Onde fica X?” (arquivos, pastas, testes). Onboarding rápido. Antes de criar **novos módulos** ou mover código entre pastas. |
+| **`docs/CONVENTIONS.md`** | Estilo de código, nomenclatura, organização de imports e arquivos. PRs que tocam muitos arquivos ou padronização. |
+| **`docs/INTEGRATIONS.md`** | HTTP, base URL / env (`EXPO_PUBLIC_API_URL`, `react-native-config`), headers Bearer, endpoints usados, EAS, MMKV. Tarefas de **API, ambiente, build ou persistência**. |
+| **`docs/TESTING.md`** | Escrever ou alterar testes, Jest, mocks, `__tests__/`, cobertura. |
+| **`docs/CONCERNS.md`** | Planejamento, revisão de risco, dívida técnica conhecida, decisões que **não repetir** (ex.: login demo, feed desconectado da query). Leia no início de épicos maiores ou refactors sensíveis. |
+
+### Combinações frequentes
+
+- **Nova tela ou fluxo de navegação:** `ARCHITECTURE.md` + `STRUCTURE.md` + (se UI) regras em `.cursor/rules/`.
+- **Integrar backend / auth real:** `INTEGRATIONS.md` + `ARCHITECTURE.md` + `CONCERNS.md` + `.spec/docs/endpoints-disponiveis.md` se precisar do contrato esperado.
+- **Só ajuste visual em tela existente:** `CONVENTIONS.md` + regras `design-*` / `engineering-mobile-app-builder`; `STACK.md` só se envolver biblioteca nova.
+- **Bug ou comportamento inesperado em rede ou sessão:** `INTEGRATIONS.md` + `CONCERNS.md` + código de `src/services/api/client.ts` e `src/store/authStore.ts`.
+
+---
+
+## Especificações (`.spec/docs/`)
+
+| Arquivo (exemplos) | Quando incluir |
+|--------------------|----------------|
+| **`overview.md`** | Visão de produto e escopo do app. |
+| **`endpoints-disponiveis.md`** | Implementar ou alinhar chamadas HTTP com o backend documentado. |
+| **`layout-analysis.md`** | Fidelidade de UI, componentes, estados de tela (junto às regras de design em `.cursor/rules/design/`). |
+
+---
+
+## Resumo para o agente
+
+1. Tarefa **pequena e localizada** → abra só os arquivos de código relevantes; use `STRUCTURE.md` se não souber o caminho.
+2. Tarefa que **mexe em arquitetura, API ou auth** → inclua `ARCHITECTURE.md`, `INTEGRATIONS.md` e `CONCERNS.md`.
+3. Tarefa **nova dependência ou stack** → inclua `STACK.md`.
+4. Dúvida de **estilo / onde colocar código** → `CONVENTIONS.md` + `STRUCTURE.md`.
+
+**Obrigatório:** para cada tarefa, siga a tabela acima e **traga ao contexto** (leitura com ferramentas ou `@arquivo`) as docs de `docs/` e `.spec/docs/` que se aplicam — esta regra só roteia; o conteúdo detalhado está nesses arquivos.

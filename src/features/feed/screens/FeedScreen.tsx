@@ -12,6 +12,7 @@ import { typography } from '@theme/typography';
 import { PostCard } from '../components/PostCard';
 import { PostOptionsSheet } from '../components/PostOptionsSheet';
 import { SkeletonCard } from '../components/SkeletonCard';
+import { useExploreFeed } from '../hooks/useExploreFeed';
 import { useFeed } from '../hooks/useFeed';
 import { useFeedMutations } from '../hooks/useFeedMutations';
 import { useLikedPosts } from '../hooks/useLikedPosts';
@@ -28,7 +29,10 @@ export function FeedScreen() {
   const [optionsPost, setOptionsPost] = useState<PostWithAuthor | null>(null);
 
   const forYouEnabled = feedTab === 'foryou';
+  const exploreEnabled = feedTab === 'explore';
+
   const feed = useFeed(forYouEnabled);
+  const exploreFeed = useExploreFeed(exploreEnabled);
   const liked = useLikedPosts();
   const { likeMutation, unlikeMutation, deleteMutation } = useFeedMutations();
 
@@ -37,18 +41,35 @@ export function FeedScreen() {
     [feed.data?.pages],
   );
 
+  const flatExploreData = useMemo(
+    () => exploreFeed.data?.pages.flatMap((p) => p.data ?? []) ?? [],
+    [exploreFeed.data?.pages],
+  );
+
   const firstPage = feed.data?.pages[0];
   const totalCount = firstPage?.ct ?? 0;
+
+  const exploreFirstPage = exploreFeed.data?.pages[0];
+  const exploreTotalCount = exploreFirstPage?.ct ?? 0;
 
   const showInitialSkeleton =
     forYouEnabled && (feed.isPending || (feed.isFetching && flatData.length === 0));
 
+  const showExploreSkeleton =
+    exploreEnabled &&
+    (exploreFeed.isPending || (exploreFeed.isFetching && flatExploreData.length === 0));
+
   const onEndReached = useCallback(() => {
-    if (!forYouEnabled) return;
-    if (feed.hasNextPage && !feed.isFetchingNextPage) {
-      void feed.fetchNextPage();
+    if (forYouEnabled) {
+      if (feed.hasNextPage && !feed.isFetchingNextPage) {
+        void feed.fetchNextPage();
+      }
+    } else if (exploreEnabled) {
+      if (exploreFeed.hasNextPage && !exploreFeed.isFetchingNextPage) {
+        void exploreFeed.fetchNextPage();
+      }
     }
-  }, [feed, forYouEnabled]);
+  }, [feed, exploreFeed, forYouEnabled, exploreEnabled]);
 
   const renderItem = useCallback(
     ({ item }: { item: PostWithAuthor }) => (
@@ -73,6 +94,13 @@ export function FeedScreen() {
     !feed.isFetching &&
     flatData.length === 0 &&
     totalCount === 0;
+
+  const emptyExplore =
+    exploreEnabled &&
+    !exploreFeed.isPending &&
+    !exploreFeed.isFetching &&
+    flatExploreData.length === 0 &&
+    exploreTotalCount === 0;
 
   const d = colors.dark;
 
@@ -102,10 +130,31 @@ export function FeedScreen() {
         </Pressable>
       </View>
 
-      {feedTab === 'explore' ? (
-        <View style={styles.explorePlaceholder}>
-          <Text style={styles.exploreText}>Explore em breve</Text>
+      {showExploreSkeleton ? (
+        <View style={styles.skeletonWrap}>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </View>
+      ) : exploreEnabled && exploreFeed.isError ? (
+        <Text style={styles.errorText}>Não foi possível carregar o Explore.</Text>
+      ) : emptyExplore ? (
+        <View style={styles.emptyWrap}>
+          <Text style={styles.emptyText}>Nenhuma publicação para explorar no momento.</Text>
+        </View>
+      ) : exploreEnabled ? (
+        <FlashList
+          data={flatExploreData}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            exploreFeed.isFetchingNextPage ? (
+              <ActivityIndicator color={d.textMuted} style={styles.footerSpinner} />
+            ) : null
+          }
+        />
       ) : showInitialSkeleton ? (
         <View style={styles.skeletonWrap}>
           <SkeletonCard />
@@ -228,15 +277,6 @@ const styles = StyleSheet.create({
   emptyButtonText: {
     ...typography.subtitle,
     color: colors.dark.text,
-  },
-  explorePlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  exploreText: {
-    ...typography.body,
-    color: colors.dark.textMuted,
   },
   footerSpinner: {
     paddingVertical: spacing.md,

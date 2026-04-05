@@ -15,6 +15,14 @@ export async function fetchFeed(params: { page: number; limit?: number }): Promi
   return data;
 }
 
+export async function fetchExploreFeed(params: { page: number; limit?: number }): Promise<FeedPage> {
+  const limit = params.limit ?? FEED_LIMIT;
+  const { data } = await apiClient.get<FeedPage>('/api/posts/explore', {
+    params: { page: params.page, limit },
+  });
+  return data;
+}
+
 export async function fetchLikedPosts(): Promise<number[]> {
   const { data } = await apiClient.get<ApiEnvelope<number[]>>('/api/users/me/liked-posts');
   return data.data ?? [];
